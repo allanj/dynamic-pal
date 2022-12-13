@@ -101,6 +101,7 @@ class ProgramInterface:
         if self.verbose:
             print(gens)
         code = self.process_generation_to_code(gens)
+        # print(code)
         self.history.append(gens)
         return code
     
@@ -136,4 +137,22 @@ class ProgramInterface:
                     continue
                 results.append(exec_result)
         counter = Counter(results)
-        return counter.most_common(1)[0][0]
+        return code_snippets, counter.most_common(1)[0][0]
+    
+    def run_with_variables(self, prompt: str, variable_string: str, time_out: float =10, temperature: float =0.0, top_p: float =1.0, 
+            max_tokens: int =512, majority_at: int =None):
+        code_snippets = self.generate(prompt, majority_at=majority_at, temperature=temperature, top_p=top_p, max_tokens=max_tokens)
+        
+        results = []
+        for code in code_snippets:
+            code = [variable_string] + code
+            # print(code)
+            with timeout(time_out):
+                try:
+                    exec_result = self.execute(code)
+                except Exception as e:
+                    print(e)
+                    continue
+                results.append(exec_result)
+        counter = Counter(results)
+        return code_snippets, counter.most_common(1)[0][0]
