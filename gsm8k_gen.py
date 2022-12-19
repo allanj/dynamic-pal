@@ -10,24 +10,27 @@ import torch.nn as nn
 import os
 import logging
 from transformers import set_seed
+import logging
 from accelerate import Accelerator
+from accelerate.logging import get_logger
 from accelerate.utils import pad_across_processes
 from accelerate import DistributedDataParallelKwargs
 from pal.data.data_processor import read_from_dataset, tokenize_data, PaddedDataCollator
 from pal.core.runtime import GenericRuntime
 from pal.data.code_executor import run_code
+from functools import partial
 
-ddp_kwargs = DistributedDataParallelKwargs(find_unused_parameters=True)
+ddp_kwargs = DistributedDataParallelKwargs(find_unused_parameters=False)
 accelerator = Accelerator(kwargs_handlers=[ddp_kwargs])
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 logger.setLevel(logging.INFO)
 logging.basicConfig(
-	format="%(asctime)s - %(levelname)s - %(name)s -   %(message)s",
-	datefmt="%m/%d/%Y %H:%M:%S",
-	level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(name)s -   %(message)s",
+    datefmt="%m/%d/%Y %H:%M:%S",
+    level=logging.INFO,
 )
-
+tqdm = partial(tqdm, bar_format='{l_bar}{bar:10}{r_bar}{bar:-10b}', disable=not accelerator.is_local_main_process)
 
 def parse_arguments(parser:argparse.ArgumentParser):
     # data Hyperparameters
@@ -55,7 +58,7 @@ def parse_arguments(parser:argparse.ArgumentParser):
     parser.add_argument('--learning_rate', type=float, default=2e-5, help="learning rate of the AdamW optimizer")
     parser.add_argument('--max_grad_norm', type=float, default=1.0, help="The maximum gradient norm")
     parser.add_argument('--num_epochs', type=int, default=40, help="The number of epochs to run")
-    parser.add_argument('--fp16', type=int, default=0, choices=[0,1], help="using fp16 to train the model")
+    parser.add_argument('--fp16', type=int, default=1, choices=[0,1], help="using fp16 to train the model")
 
 
     # testing a pretrained model
@@ -155,7 +158,7 @@ def evaluate(args, runtime:GenericRuntime, valid_dataloader: DataLoader, model: 
             code = ""
             ans = None
         score = 0
-        if ans == float(metadata["answer"]):
+        if ans is not None and ans == float(metadata["answer"]):
             correct += 1
             score = 1
         all_data.append({"question": metadata["question"],
@@ -179,44 +182,53 @@ def main():
     tokenizer = AutoTokenizer.from_pretrained(bert_model_name, use_fast=True)
     model = AutoModelForCausalLM.from_pretrained(bert_model_name)
 
+    logger.info("[Data Info] Reading all data")
+    dataset = read_from_dataset(dataset_file_path=args.train_file, split="train")
+    eval_dataset = read_from_dataset(dataset_file_path=args.dev_file, split="dev")
+    if args.train_num > 0:
+        dataset = dataset.select(range(args.train_num))
+    if args.dev_num > 0:
+        eval_dataset = eval_dataset.select(range(args.dev_num))
+    logger.info(f"[Data Info] Training instances: {len(dataset)}, Validation instances: {len(eval_dataset)}")
+    logger.info(f"[Data Info] Tokenizzing the dataset")
+    with accelerator.main_process_first():
+        train_tokenized_data = dataset.map(
+            function=tokenize_data,
+            fn_kwargs={"tokenizer": tokenizer},
+            batched=True,
+            load_from_cache_file=True,
+            num_proc=args.num_proc,
+            remove_columns=dataset.column_names
+        )
+        eval_tokenized_dataset = eval_dataset.map(
+            function=tokenize_data,
+            fn_kwargs={"tokenizer": tokenizer},
+            batched=True,
+            load_from_cache_file=True,
+            num_proc=args.num_proc,
+            remove_columns=eval_dataset.column_names
+        )
+    # Prepare data loader
+    logger.info("[Data Info] Loading data")
+    collator = PaddedDataCollator(tokenizer=tokenizer)
+    train_dataloader = DataLoader(train_tokenized_data.remove_columns("metadata"), batch_size=args.batch_size, shuffle=True, num_workers=8, collate_fn=collator)
+    valid_dataloader = DataLoader(eval_tokenized_dataset.remove_columns("metadata"), batch_size=args.batch_size, shuffle=False, num_workers=8,
+                                  collate_fn=collator)
+    res_file = f"results/{args.model_folder}.res.json"
+    err_file = f"results/{args.model_folder}.err.json"
     # Read dataset
     if args.mode == "train":
-        logger.info("[Data Info] Reading all data")
-        dataset = read_from_dataset(dataset_file_path=args.train_file, split="train").select(range(args.train_num))
-        eval_dataset = read_from_dataset(dataset_file_path=args.dev_file, split="dev").select(range(args.dev_num))
-        logger.info(f"[Data Info] Training instances: {len(dataset)}, Validation instances: {len(eval_dataset)}")
-        logger.info(f"[Data Info] Tokenizzing the dataset")
-        with accelerator.main_process_first():
-            train_tokenized_data = dataset.map(
-                function = tokenize_data,
-                fn_kwargs = {"tokenizer": tokenizer},
-                batched = True,
-                load_from_cache_file = True,
-                num_proc=args.num_proc,
-                remove_columns = dataset.column_names
-            )
-            eval_tokenized_dataset = eval_dataset.map(
-                function = tokenize_data,
-                fn_kwargs = {"tokenizer": tokenizer},
-                batched = True,
-                load_from_cache_file = True,
-                num_proc=args.num_proc,
-                remove_columns = eval_dataset.column_names
-            )
-        # Prepare data loader
-        logger.info("[Data Info] Loading data")
-        collator = PaddedDataCollator(tokenizer=tokenizer)
-        train_dataloader = DataLoader(train_tokenized_data.remove_columns("metadata"), batch_size=args.batch_size, shuffle=True, num_workers=8, collate_fn=collator)
-        valid_dataloader = DataLoader(eval_tokenized_dataset.remove_columns("metadata"), batch_size=args.batch_size, shuffle=False, num_workers=8, collate_fn=collator)
-
-        res_file = f"results/{args.model_folder}.res.json"
-        err_file = f"results/{args.model_folder}.err.json"
         # Train the model
         train(args, model, train_dataloader,
                   num_epochs= args.num_epochs, bert_model_name=bert_model_name,
                   valid_dataloader = valid_dataloader,
                   dev=torch.device(args.device), tokenizer=tokenizer, all_metadata=eval_tokenized_dataset["metadata"],
                   res_file=res_file, error_file=err_file)
+    else:
+        runtime = GenericRuntime()
+        model = AutoModelForCausalLM.from_pretrained(f"model_files/{args.model_folder}")
+        model, valid_dataloader = accelerator.prepare(model, valid_dataloader)
+        test_accuracy = evaluate(args, runtime, valid_dataloader, model, fp16=bool(args.fp16), tokenizer=tokenizer, res_file=res_file, all_metadata=eval_tokenized_dataset["metadata"])
 
 if __name__ == "__main__":
     # logger.addHandler(logging.StreamHandler())

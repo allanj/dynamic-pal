@@ -5,6 +5,9 @@ from datasets import Dataset, load_from_disk
 from typing import Dict
 from transformers import PreTrainedTokenizer
 import torch
+import logging
+
+logger = logging.getLogger(__name__)
 
 def read_from_dataset(dataset_file_path: str, split:str):
     """
@@ -15,10 +18,12 @@ def read_from_dataset(dataset_file_path: str, split:str):
     """
     hf_data_cached_file_name = dataset_file_path.replace(".json","_cached")
     if os.path.exists(hf_data_cached_file_name):
-        print("Loading cached file")
+        logger.info("Loading cached file")
         hf_data = load_from_disk(hf_data_cached_file_name)
     else:
+        logger.info(f"reading from: {dataset_file_path}")
         data = read_data(dataset_file_path)
+        logger.info(f"length of data: {len(data)} for split: {split}")
         new_data = []
         for obj in data:
             if split == "train" and obj["score"] == 0:
