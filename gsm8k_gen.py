@@ -158,7 +158,12 @@ def evaluate(args, runtime:GenericRuntime, valid_dataloader: DataLoader, model: 
             code = ""
             ans = None
         score = 0
-        if ans is not None and ans == float(metadata["answer"]):
+        # TODO: use float to measure
+        try:
+            numeric_ans = float(ans)
+        except:
+            numeric_ans = None
+        if numeric_ans is not None and math.fabs(numeric_ans -  float(metadata["answer"])) < 1e-2:
             correct += 1
             score = 1
         all_data.append({"question": metadata["question"],
