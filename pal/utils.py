@@ -4,9 +4,9 @@ from transformers import AdamW, get_linear_schedule_with_warmup
 import torch.nn as nn
 from typing import Tuple
 import torch
-import logging
+from accelerate.logging import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 def write_data(file: str, data) -> None:
     with open(file, "w", encoding="utf-8") as write_file:

@@ -88,9 +88,10 @@ class PaddedDataCollator:
         batch = {"input_ids": [], "attention_mask": [], "labels": []}
         max_input_length = max(len(x["input_ids"]) for x in features)
         for feature in features:
-            input_ids = feature["input_ids"] + [self.tokenizer.eos_token_id] * (max_input_length - len(feature["input_ids"]))
-            attention_mask = feature["attention_mask"] + [0] * (max_input_length - len(feature["attention_mask"]))
-            labels = feature["input_ids"] + [-100] * (max_input_length - len(feature["input_ids"]))
+            # change to left padding
+            input_ids = [self.tokenizer.eos_token_id] * (max_input_length - len(feature["input_ids"])) + feature["input_ids"]
+            attention_mask = [0] * (max_input_length - len(feature["attention_mask"])) + feature["attention_mask"]
+            labels = [-100] * (max_input_length - len(feature["input_ids"])) + feature["input_ids"]
             batch["input_ids"].append(input_ids)
             batch["attention_mask"].append(attention_mask)
             batch["labels"].append(labels)

@@ -114,11 +114,11 @@ def train(args, model, train_dataloader: DataLoader, num_epochs: int, bert_model
             if test_dataloader is not None:
                 test_accuracy = evaluate(args, runtime, test_dataloader, model, fp16=bool(args.fp16), tokenizer=tokenizer, res_file=res_file, all_metadata= all_metadata)
             if val_accuracy > best_accuracy:
-                logger.info(f"[Model Info] Saving the best model with best valid bleu {val_accuracy:.6f} at epoch {epoch} ("
-                            f"valid bleu: {val_accuracy:.6f} test_bleu: {test_accuracy:.6f}")
+                logger.info(f"[Model Info] Saving the best model with best valid accuracy {val_accuracy:.6f} at epoch {epoch} ("
+                            f"valid accuracy: {val_accuracy:.6f} test accuracy: {test_accuracy:.6f}")
                 best_accuracy = val_accuracy
-                model_to_save = model.module if hasattr(model, "module") else model
-                model_to_save.save_pretrained(f"model_files/{args.model_folder}")
+                unwraped_model = accelerator.unwrap_model(model)
+                unwraped_model.save_pretrained(f"model_files/{args.model_folder}")
                 tokenizer.save_pretrained(f"model_files/{args.model_folder}")
     logger.info(f"[Model Info] Best validation performance: {best_accuracy}")
 
@@ -131,7 +131,7 @@ def evaluate(args, runtime:GenericRuntime, valid_dataloader: DataLoader, model: 
     with torch.no_grad():
         for index, feature in tqdm(enumerate(valid_dataloader), desc="--validation", total=len(valid_dataloader)):
             with torch.cuda.amp.autocast(enabled=fp16):
-                module = model.module if hasattr(model, 'module') else model
+                module = accelerator.unwrap_model(model)
                 ## Note: need to check if the underlying model has revised the "prepare_inputs_for_generation" method
                 generated_ids = module.generate(input_ids=feature["input_ids"],
                                                 attention_mask=feature["attention_mask"],
@@ -140,14 +140,8 @@ def evaluate(args, runtime:GenericRuntime, valid_dataloader: DataLoader, model: 
                                                 return_dict_in_generate=True).sequences
                 generated_ids = accelerator.pad_across_processes(generated_ids, dim=1, pad_index=tokenizer.eos_token_id)
                 generated_ids = accelerator.gather_for_metrics(generated_ids)
-                # label_ids = accelerator.gather_for_metrics(feature["labels"])
                 prediction = tokenizer.batch_decode(generated_ids, skip_special_tokens=True, clean_up_tokenization_spaces=False)
-                # cloned_label_ids = label_ids.clone()
-                # cloned_label_ids[cloned_label_ids == -100] = tokenizer.eos_token_id
-                # gold = tokenizer.batch_decode(cloned_label_ids, skip_special_tokens=True, clean_up_tokenization_spaces=False)
-                # print(gold, flush=True)
                 predictions.extend(prediction)
-                # labels.extend(gold)
     correct = 0
     all_data = []
     for idx, (prediction, metadata) in enumerate(zip(predictions, all_metadata)):
@@ -186,7 +180,7 @@ def main():
     bert_model_name = args.bert_model_name if args.bert_folder == "" or args.bert_folder=="none" else f"{args.bert_folder}/{args.bert_model_name}"
 
     tokenizer = AutoTokenizer.from_pretrained(bert_model_name, use_fast=True)
-    model = AutoModelForCausalLM.from_pretrained(bert_model_name)
+    model = AutoModelForCausalLM.from_pretrained(bert_model_name, pad_token_id=tokenizer.eos_token_id)
 
     logger.info("[Data Info] Reading all data")
     dataset = read_from_dataset(dataset_file_path=args.train_file, split="train")
