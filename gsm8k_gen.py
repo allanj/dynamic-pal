@@ -138,6 +138,7 @@ def evaluate(args, runtime:GenericRuntime, valid_dataloader: DataLoader, model: 
                                                 num_beams=1,
                                                 max_length=args.max_length,
                                                 return_dict_in_generate=True).sequences
+                generated_ids = accelerator.pad_across_processes(generated_ids, dim=1, pad_index=tokenizer.eos_token_id)
                 generated_ids = accelerator.gather_for_metrics(generated_ids)
                 # label_ids = accelerator.gather_for_metrics(feature["labels"])
                 prediction = tokenizer.batch_decode(generated_ids, skip_special_tokens=True, clean_up_tokenization_spaces=False)
