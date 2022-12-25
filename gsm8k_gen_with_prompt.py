@@ -13,9 +13,8 @@ from transformers import set_seed
 import logging
 from accelerate import Accelerator
 from accelerate.logging import get_logger
-from accelerate.utils import pad_across_processes
 from accelerate import DistributedDataParallelKwargs
-from pal.data.data_processor import read_from_dataset, tokenize_data, PaddedDataCollator
+from pal.data.data_processor import read_from_dataset, tokenize_data_with_prompt, PaddedDataCollator
 from pal.core.runtime import GenericRuntime
 from pal.data.code_executor import run_code
 from functools import partial
@@ -146,7 +145,7 @@ def evaluate(args, runtime:GenericRuntime, valid_dataloader: DataLoader, model: 
     all_data = []
     for idx, (prediction, metadata) in enumerate(zip(predictions, all_metadata)):
         try:
-            predicted_code = prediction.split("The resulting python solution: ")[1]
+            predicted_code = prediction.split("# python solution:\n\n")[-1] # need to use the last one
             code, ans = run_code(runtime=runtime, code_gen=predicted_code, answer_expr="solution()")
         except:
             predicted_code = "<split failed>"
@@ -183,6 +182,7 @@ def main():
     model = AutoModelForCausalLM.from_pretrained(lm_model_name, pad_token_id=tokenizer.eos_token_id)
 
     logger.info("[Data Info] Reading all data")
+    all_train_data = read_data(args.train_file)
     dataset = read_from_dataset(dataset_file_path=args.train_file, split="train")
     eval_dataset = read_from_dataset(dataset_file_path=args.dev_file, split="dev")
     if args.train_num > 0:
@@ -193,16 +193,16 @@ def main():
     logger.info(f"[Data Info] Tokenizzing the dataset")
     with accelerator.main_process_first():
         train_tokenized_data = dataset.map(
-            function=tokenize_data,
-            fn_kwargs={"tokenizer": tokenizer},
+            function=tokenize_data_with_prompt,
+            fn_kwargs={"tokenizer": tokenizer, "all_training_data": all_train_data},
             batched=True,
             load_from_cache_file=True,
             num_proc=args.num_proc,
             remove_columns=dataset.column_names
         )
         eval_tokenized_dataset = eval_dataset.map(
-            function=tokenize_data,
-            fn_kwargs={"tokenizer": tokenizer},
+            function=tokenize_data_with_prompt,
+            fn_kwargs={"tokenizer": tokenizer, "all_training_data": all_train_data},
             batched=True,
             load_from_cache_file=True,
             num_proc=args.num_proc,
