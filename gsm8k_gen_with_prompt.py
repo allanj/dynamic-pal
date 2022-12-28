@@ -135,7 +135,7 @@ def evaluate(args, runtime:GenericRuntime, valid_dataloader: DataLoader, model: 
                 generated_ids = module.generate(input_ids=feature["input_ids"],
                                                 attention_mask=feature["attention_mask"],
                                                 num_beams=1,
-                                                max_length=args.max_length,
+                                                max_new_tokens=args.max_length,
                                                 return_dict_in_generate=True).sequences
                 generated_ids = accelerator.pad_across_processes(generated_ids, dim=1, pad_index=tokenizer.eos_token_id)
                 generated_ids = accelerator.gather_for_metrics(generated_ids)
@@ -179,7 +179,7 @@ def main():
     lm_model_name = args.bert_model_name if args.bert_folder == "" or args.bert_folder=="none" else f"{args.bert_folder}/{args.bert_model_name}"
 
     tokenizer = AutoTokenizer.from_pretrained(lm_model_name, use_fast=True)
-    model = AutoModelForCausalLM.from_pretrained(lm_model_name, pad_token_id=tokenizer.eos_token_id)
+    model = AutoModelForCausalLM.from_pretrained(lm_model_name, pad_token_id=tokenizer.eos_token_id, low_cpu_mem_usage=True)
 
     logger.info("[Data Info] Reading all data")
     all_train_data = read_data(args.train_file)

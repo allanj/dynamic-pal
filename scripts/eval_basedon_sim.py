@@ -187,7 +187,7 @@ if __name__ == '__main__':
     elif dataset_folder == "MathQA":
         DATA_PATH = f'datasets/{dataset_folder}/mathqa_test_nodup_our_filtered.json'
         if args.similarity_order != 'no_similarity':
-            training_data = read_data(f'datasets/{dataset_folder}/train_eval_result.json')
+            training_data = read_data(f'datasets/{dataset_folder}/MathQA_trainset_prompted_combined.json')
             train_sent_embs = np.load(f'datasets/{dataset_folder}/mathqa_train_emb.npy')
             test_sent_embs = np.load(f'datasets/{dataset_folder}/mathqa_test_emb.npy')
         test_question_key = "Problem"
