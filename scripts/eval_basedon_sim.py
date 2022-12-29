@@ -39,7 +39,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--append', action='store_true')
 parser.add_argument('--verbose', action='store_true')
 parser.add_argument('--dataset', default='gsm8k', type=str)
-parser.add_argument('--majority_at', default=None, type=int)
+parser.add_argument('--majority_at', default=1, type=int)
 parser.add_argument('--temperature', default=0.0, type=float)
 parser.add_argument('--top_p', default=1.0, type=float)
 parser.add_argument('--max_tokens', default=600, type=int)
@@ -197,7 +197,7 @@ if __name__ == '__main__':
 
     examples = read_data(DATA_PATH)
     os.makedirs("results", exist_ok=True)
-    output_name = f"results/{dataset_folder}_test_{args.similarity_order}_result.json"
+    output_name = f"results/{dataset_folder}_test_{args.similarity_order}_majority_{args.majority_at}_result.json"
 
     itf = interface.ProgramInterface(
         stop='\n\n\n',

@@ -19,14 +19,14 @@ def tokenize(example_dict: Dict, tokenizer: PreTrainedTokenizerFast):
     for question in example_dict["question"]:
         prompt = math_prompts.MATH_PROMPT.format(question=question)
         dict = tokenizer(prompt, truncation=True, max_length=512, return_attention_mask=True, return_tensors="pt")
-        features["input_ids"].append(dict["input_ids"])
-        features["attention_mask"].append(dict["attention_mask"])
+        features["input_ids"].append(dict["input_ids"][0])
+        features["attention_mask"].append(dict["attention_mask"][0])
     return features
 
 
 ddp_kwargs = DistributedDataParallelKwargs(find_unused_parameters=False)
 accelerator = Accelerator(kwargs_handlers=[ddp_kwargs])
-fp16=False #TODO: remove this
+fp16=True #TODO: remove this
 
 tqdm = partial(tqdm, bar_format='{l_bar}{bar:10}{r_bar}{bar:-10b}', disable=not accelerator.is_local_main_process)
 
@@ -53,7 +53,9 @@ processed_data = hf_data.map(
     remove_columns=hf_data.column_names
 )
 
-loader = DataLoader(processed_data, batch_size=2, shuffle=False, num_workers=0, collate_fn=default_data_collator)
+loader = DataLoader(processed_data, batch_size=1, shuffle=False, num_workers=0, collate_fn=default_data_collator)
+
+model, loader = accelerator.prepare(model, loader)
 
 model.eval()
 predictions = []
@@ -66,9 +68,10 @@ with torch.no_grad():
             generated_ids = module.generate(input_ids=feature["input_ids"],
                                             attention_mask=feature["attention_mask"],
                                             num_beams=1,
-                                            max_new_tokens=1024,
+                                            max_new_tokens=300,
                                             return_dict_in_generate=True).sequences
             generated_ids = accelerator.gather_for_metrics(generated_ids)
-            prediction = tokenizer.batch_decode(generated_ids, skip_special_tokens=True, clean_up_tokenization_spaces=False)
+            generated_ids = generated_ids[0, len(feature["input_ids"][0]):]
+            prediction = tokenizer.decode(generated_ids, skip_special_tokens=True, clean_up_tokenization_spaces=False)
             print(prediction)
 
