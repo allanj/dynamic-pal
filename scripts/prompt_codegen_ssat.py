@@ -13,11 +13,7 @@ from functools import partial
 from tqdm import tqdm
 import torch
 from pal.utils import read_data, write_data
-from transformers.data.data_collator import default_data_collator
 from pal.core.runtime import GenericRuntime
-from pal.core.interface import timeout
-from pal.data.code_executor import run_code
-import math
 import logging
 import argparse
 ddp_kwargs = DistributedDataParallelKwargs(find_unused_parameters=False)
@@ -45,14 +41,13 @@ def parse_arguments(parser:argparse.ArgumentParser):
 args = parse_arguments(argparse.ArgumentParser())
 
 def tokenize(example_dict: Dict, tokenizer: PreTrainedTokenizerFast):
-    features = {"input_ids": [], "attention_mask": [], "metadata": []}
-    for question, answer in zip(example_dict["question"], example_dict["extracted_answer"]):
+    features = {"input_ids": [], "attention_mask": []}
+    for question in example_dict["question"]:
         question = question.replace("\n", " ")
         prompt = ssat_parsing_prompt.MATH_PROMPT.format(question=question)
         dict = tokenizer(prompt, truncation=True, max_length=2048, return_attention_mask=True, return_tensors="pt")
         features["input_ids"].append(dict["input_ids"][0])
         features["attention_mask"].append(dict["attention_mask"][0])
-        features["metadata"].append(answer)
     return features
 
 
@@ -105,8 +100,7 @@ processed_data = hf_data.map(
     remove_columns=hf_data.column_names
 )
 
-metadata = processed_data["metadata"]
-loader = DataLoader(processed_data.remove_columns(["metadata"]), batch_size=batch_size, shuffle=False, num_workers=0, collate_fn=collator)
+loader = DataLoader(processed_data, batch_size=batch_size, shuffle=False, num_workers=0, collate_fn=collator)
 
 model, loader, optimizer = accelerator.prepare(model, loader, optimizer)
 runtime = GenericRuntime()
