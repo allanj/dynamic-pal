@@ -173,8 +173,8 @@ if __name__ == '__main__':
     if dataset_folder == "gsm8k":
         DATA_PATH = f'datasets/{dataset_folder}/gsm8k_test_sent_split.json'
         training_data = read_data(f'datasets/{dataset_folder}/gsm8k_train_eval_result.json')
-        train_sent_embs = np.load(f'datasets/{dataset_folder}/gsm8k_train_sent_emb.npy')
-        test_sent_embs = np.load(f'datasets/{dataset_folder}/gsm8k_test_sent_emb.npy')
+        train_sent_embs = np.load(f'datasets/{dataset_folder}/gsm8k_train_sent_emb_updated.npy')
+        test_sent_embs = np.load(f'datasets/{dataset_folder}/gsm8k_test_sent_emb_updated.npy')
         test_question_key = "question"
         answer_key = 'extracted_answer'
     elif dataset_folder == "svamp":
