@@ -30,7 +30,7 @@ def read_from_svamp(dataset_file_path: str, split:str):
                            "generated_code_string": obj["generation"][-1][0]}
 
             else:
-                new_obj = {'question': obj['Question'],
+                new_obj = {'question': obj['question'],
                            'answer': float(obj['answer']),
                            "generated_code_string": ""}
             if "top_k_idxs" in obj:
