@@ -18,8 +18,6 @@ name2model = {
 
 def parse_arguments(parser):
     parser.add_argument('--dataset', default='gsm8k', type=str, choices=["gsm8k", "svamp", "MathQA"])
-    parser.add_argument('--top_p', default=1.0, type=float)
-    parser.add_argument('--max_tokens', default=600, type=int)
     parser.add_argument('--embedding_model_name', default='text-embedding-ada-002', type=str)
     args = parser.parse_args()
     # Print out the arguments
@@ -85,15 +83,15 @@ if __name__ == '__main__':
         local_model = load_sent_model(model_name=embedding_model_name)
     suffix = embedding_model_name.split("/")[-1]
     if dataset == 'gsm8k':
-        prompt_emb(input_file="dataset/gsm8k/gsm8k_train_sent_split.json",
-                   output_file=f"dataset/gsm8k/gsm8k_train_sent_emb_updated_{suffix}.npy", dataset_name=dataset,
+        prompt_emb(input_file="datasets/gsm8k/gsm8k_train_sent_split.json",
+                   output_file=f"datasets/gsm8k/gsm8k_train_sent_emb_{suffix}.npy", dataset_name=dataset,
                    model_name= embedding_model_name, local_model=local_model)
-        prompt_emb(input_file="dataset/gsm8k/gsm8k_test_sent_split.json",
-                   output_file=f"dataset/gsm8k/gsm8k_test_sent_emb_updated_{suffix}.npy", dataset_name=dataset,
+        prompt_emb(input_file="datasets/gsm8k/gsm8k_test_sent_split.json",
+                   output_file=f"datasets/gsm8k/gsm8k_test_sent_emb_{suffix}.npy", dataset_name=dataset,
                    model_name= embedding_model_name, local_model=local_model)
     elif dataset == "svamp":
         prompt_emb(input_file="datasets/svamp/trainset_nodup.json",
-                   output_file=f"datasets/svamp/trainset.npy_{suffix}", dataset_name=dataset,
+                   output_file=f"datasets/svamp/trainset_{suffix}.npy", dataset_name=dataset,
                    model_name= embedding_model_name, local_model=local_model)
         prompt_emb(input_file="datasets/svamp/testset_nodup.json",
                    output_file=f"datasets/svamp/testset_{suffix}.npy", dataset_name=dataset,

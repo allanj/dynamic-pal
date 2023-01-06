@@ -44,7 +44,7 @@ parser.add_argument('--temperature', default=0.0, type=float)
 parser.add_argument('--top_p', default=1.0, type=float)
 parser.add_argument('--max_tokens', default=600, type=int)
 parser.add_argument('--similarity_order', default='most_similar', type=str, choices=['most_similar', 'least_similar', 'random', 'no_similarity'])
-
+parser.add_argument('--emb_model', default='text-embedding-ada-002', type=str)
 
 
 def find_top_k_prompt(test_sent_embs: np.array, test_question_idx: int, train_sent_embs: np.array, training_data, k= 8,
@@ -77,11 +77,14 @@ def find_top_k_prompt(test_sent_embs: np.array, test_question_idx: int, train_se
             pass
         top_k_idx = []
         cursor = 0
+        have_score_not_1 = False
         while len(top_k_idx) < k:
             ## only accept the data that have score == 1
             if training_data[sorted_idx[cursor]]['score'] == 1:
                 # print(sim[sorted_idx[cursor]])
                 top_k_idx.append(sorted_idx[cursor])
+            else:
+                have_score_not_1 = True
             cursor += 1
     else:
         ## normal prompts
@@ -170,26 +173,27 @@ if __name__ == '__main__':
     train_sent_embs = None
     test_sent_embs = None
     dataset_folder = args.dataset
+    emb_suffix = args.emb_model
     if dataset_folder == "gsm8k":
         DATA_PATH = f'datasets/{dataset_folder}/gsm8k_test_sent_split.json'
-        training_data = read_data(f'datasets/{dataset_folder}/gsm8k_train_eval_result.json')
-        train_sent_embs = np.load(f'datasets/{dataset_folder}/gsm8k_train_sent_emb_updated.npy')
-        test_sent_embs = np.load(f'datasets/{dataset_folder}/gsm8k_test_sent_emb_updated.npy')
+        training_data = read_data(f'datasets/{dataset_folder}/gsm8k_train_eval_result_expanded_1.json')
+        train_sent_embs = np.load(f'datasets/{dataset_folder}/gsm8k_train_sent_emb_{emb_suffix}.npy')
+        test_sent_embs = np.load(f'datasets/{dataset_folder}/gsm8k_test_sent_emb_{emb_suffix}.npy')
         test_question_key = "question"
         answer_key = 'extracted_answer'
     elif dataset_folder == "svamp":
         DATA_PATH = f'datasets/{dataset_folder}/testset_nodup.json'
         training_data = read_data(f'datasets/{dataset_folder}/train_eval_result.json')
-        train_sent_embs = np.load(f'datasets/{dataset_folder}/trainset.npy')
-        test_sent_embs = np.load(f'datasets/{dataset_folder}/testset.npy')
+        train_sent_embs = np.load(f'datasets/{dataset_folder}/trainset_{emb_suffix}.npy')
+        test_sent_embs = np.load(f'datasets/{dataset_folder}/testset_{emb_suffix}.npy')
         test_question_key = "question"
         answer_key = "answer"
     elif dataset_folder == "MathQA":
         DATA_PATH = f'datasets/{dataset_folder}/mathqa_test_nodup_our_filtered.json'
         if args.similarity_order != 'no_similarity':
             training_data = read_data(f'datasets/{dataset_folder}/MathQA_trainset_prompted_combined.json')
-            train_sent_embs = np.load(f'datasets/{dataset_folder}/mathqa_train_emb.npy')
-            test_sent_embs = np.load(f'datasets/{dataset_folder}/mathqa_test_emb.npy')
+            train_sent_embs = np.load(f'datasets/{dataset_folder}/mathqa_train_emb_{emb_suffix}.npy')
+            test_sent_embs = np.load(f'datasets/{dataset_folder}/mathqa_test_emb_{emb_suffix}.npy')
         test_question_key = "Problem"
         answer_key = "answer"
     else:
@@ -197,7 +201,7 @@ if __name__ == '__main__':
 
     examples = read_data(DATA_PATH)
     os.makedirs("results", exist_ok=True)
-    output_name = f"results/{dataset_folder}_test_{args.similarity_order}_majority_{args.majority_at}_result.json"
+    output_name = f"results/{dataset_folder}_test_{args.similarity_order}_{emb_suffix}_majority_{args.majority_at}_result.json"
 
     itf = interface.ProgramInterface(
         stop='\n\n\n',

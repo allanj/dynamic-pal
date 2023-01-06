@@ -15,7 +15,7 @@ from accelerate import Accelerator
 from accelerate.logging import get_logger
 from accelerate.utils import pad_across_processes
 from accelerate import DistributedDataParallelKwargs
-from pal.data.data_processor import read_from_dataset, tokenize_data, PaddedDataCollator
+from pal.data.data_processor import read_from_dataset, tokenize_data, PaddedDataCollator, read_from_svamp
 from pal.core.runtime import GenericRuntime
 from pal.data.code_executor import run_code
 from functools import partial
@@ -42,8 +42,8 @@ def parse_arguments(parser:argparse.ArgumentParser):
     parser.add_argument('--num_proc', type=int, default=8, help="The number of development data, -1 means all data")
     parser.add_argument('--max_length', type=int, default=400, help="max generation length")
 
-    parser.add_argument('--train_file', type=str, default="datasets/gsm8k_train_eval_result.json")
-    parser.add_argument('--dev_file', type=str, default="datasets/gsm8k_test_sent_split.json")
+    parser.add_argument('--train_file', type=str, default="datasets/gsm8k/gsm8k_train_eval_result.json")
+    parser.add_argument('--dev_file', type=str, default="datasets/gsm8k/gsm8k_test_sent_split.json")
     parser.add_argument('--test_file', type=str, default="none")
 
 
@@ -183,8 +183,12 @@ def main():
     model = AutoModelForCausalLM.from_pretrained(lm_model_name, pad_token_id=tokenizer.eos_token_id, low_cpu_mem_usage=True)
 
     logger.info("[Data Info] Reading all data")
-    dataset = read_from_dataset(dataset_file_path=args.train_file, split="train")
-    eval_dataset = read_from_dataset(dataset_file_path=args.dev_file, split="dev")
+    if "svamp" in args.train_file:
+        dataset = read_from_svamp(dataset_file_path=args.train_file, split="train")
+        eval_dataset = read_from_svamp(dataset_file_path=args.dev_file, split="dev")
+    elif "gsm8k" in args.train_file:
+        dataset = read_from_dataset(dataset_file_path=args.train_file, split="train")
+        eval_dataset = read_from_dataset(dataset_file_path=args.dev_file, split="dev")
     if args.train_num > 0:
         dataset = dataset.select(range(args.train_num))
     if args.dev_num > 0:
