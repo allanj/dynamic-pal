@@ -24,7 +24,7 @@ def read_from_svamp(dataset_file_path: str, split:str):
                 ## we only use those correct one as training data.
                 continue
             if split == "train":
-                new_obj = {'question': obj['Question'] if "Question" in obj else obj["sQuestion"],
+                new_obj = {'question': obj['question'] if "question" in obj else obj["sQuestion"],
                            'answer': float(obj['answer']),
                            "formated_code": obj["code"][0],
                            "generated_code_string": obj["generation"][-1][0]}
