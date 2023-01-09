@@ -168,6 +168,7 @@ def evaluate(args, runtime:GenericRuntime, valid_dataloader: DataLoader, model: 
                          "code": code,
                          "generation": prediction})
     accuracy = correct / len(predictions)
+    logger.info(f"Validation accuracy: {accuracy:.6f}")
     if res_file is not None:
         write_data(file=res_file, data=all_data)
     return accuracy
