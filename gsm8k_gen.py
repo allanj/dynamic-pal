@@ -15,7 +15,7 @@ from accelerate import Accelerator
 from accelerate.logging import get_logger
 from accelerate.utils import pad_across_processes
 from accelerate import DistributedDataParallelKwargs
-from pal.data.data_processor import read_from_dataset, tokenize_data, PaddedDataCollator, read_from_svamp
+from pal.data.data_processor import read_from_dataset, tokenize_data, PaddedDataCollator, read_from_svamp, read_from_mathqa
 from pal.core.runtime import GenericRuntime
 from pal.data.code_executor import run_code
 from functools import partial
@@ -189,6 +189,9 @@ def main():
     elif "gsm8k" in args.train_file:
         dataset = read_from_dataset(dataset_file_path=args.train_file, split="train")
         eval_dataset = read_from_dataset(dataset_file_path=args.dev_file, split="dev")
+    elif "MathQA" in args.train_file:
+        dataset = read_from_mathqa(dataset_file_path=args.train_file, split="train")
+        eval_dataset = read_from_mathqa(dataset_file_path=args.dev_file, split="dev")
     if args.train_num > 0:
         dataset = dataset.select(range(args.train_num))
     if args.dev_num > 0:

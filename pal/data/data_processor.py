@@ -9,6 +9,37 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+def read_from_mathqa(dataset_file_path: str, split:str):
+    hf_data_cached_file_name = dataset_file_path.replace(".json", "_cached")
+    if os.path.exists(hf_data_cached_file_name):
+        logger.info("Loading cached file")
+        hf_data = load_from_disk(hf_data_cached_file_name)
+    else:
+        logger.info(f"reading from: {dataset_file_path}")
+        data = read_data(dataset_file_path)
+        logger.info(f"length of data: {len(data)} for split: {split}")
+        new_data = []
+        for obj in data:
+            if split == "train" and obj["score"] == 0:
+                ## we only use those correct one as training data.
+                continue
+            if split == "train":
+                new_obj = {'question': obj['Problem'],
+                           'answer': float(obj['answer']),
+                           "formated_code": obj["code"][0],
+                           "generated_code_string": obj["generation"][-1][0]}
+
+            else:
+                new_obj = {'question': obj['Problem'],
+                           'answer': float(obj['answer']),
+                           "generated_code_string": ""}
+            if "top_k_idxs" in obj:
+                new_obj["top_k_idxs"] = obj["top_k_idxs"]
+                assert len(obj["top_k_idxs"]) == 8
+            new_data.append(new_obj)
+        hf_data = Dataset.from_list(new_data)
+        hf_data.save_to_disk(hf_data_cached_file_name)
+    return hf_data
 def read_from_svamp(dataset_file_path: str, split:str):
     hf_data_cached_file_name = dataset_file_path.replace(".json", "_cached")
     if os.path.exists(hf_data_cached_file_name):
