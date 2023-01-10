@@ -9,7 +9,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-def read_from_mathqa(dataset_file_path: str, split:str):
+def read_from_mathqa(dataset_file_path: str, split:str, direct_finetune: bool):
     hf_data_cached_file_name = dataset_file_path.replace(".json", "_cached")
     if os.path.exists(hf_data_cached_file_name):
         logger.info("Loading cached file")
@@ -20,14 +20,14 @@ def read_from_mathqa(dataset_file_path: str, split:str):
         logger.info(f"length of data: {len(data)} for split: {split}")
         new_data = []
         for obj in data:
-            if split == "train" and obj["score"] == 0:
+            if split == "train" and obj["score"] == 0 and (not direct_finetune):
                 ## we only use those correct one as training data.
                 continue
             if split == "train":
                 new_obj = {'question': obj['Problem'],
                            'answer': float(obj['answer']),
-                           "formated_code": obj["code"][0],
-                           "generated_code_string": obj["generation"][-1][0]}
+                           "formated_code": obj["code"][0] if "code" in obj else "",
+                           "generated_code_string": obj["generation"][-1][0]  if "generation" in obj else ""}
 
             else:
                 new_obj = {'question': obj['Problem'],
@@ -40,7 +40,7 @@ def read_from_mathqa(dataset_file_path: str, split:str):
         hf_data = Dataset.from_list(new_data)
         hf_data.save_to_disk(hf_data_cached_file_name)
     return hf_data
-def read_from_svamp(dataset_file_path: str, split:str):
+def read_from_svamp(dataset_file_path: str, split:str, direct_finetune: bool):
     hf_data_cached_file_name = dataset_file_path.replace(".json", "_cached")
     if os.path.exists(hf_data_cached_file_name):
         logger.info("Loading cached file")
@@ -51,14 +51,14 @@ def read_from_svamp(dataset_file_path: str, split:str):
         logger.info(f"length of data: {len(data)} for split: {split}")
         new_data = []
         for obj in data:
-            if split == "train" and obj["score"] == 0:
+            if split == "train" and obj["score"] == 0 and (not direct_finetune):
                 ## we only use those correct one as training data.
                 continue
             if split == "train":
                 new_obj = {'question': obj['question'] if "question" in obj else obj["sQuestion"],
                            'answer': float(obj['answer']),
-                           "formated_code": obj["code"][0],
-                           "generated_code_string": obj["generation"][-1][0]}
+                           "formated_code": obj["code"][0]  if "code" in obj else "",
+                           "generated_code_string": obj["generation"][-1][0]  if "generation" in obj else ""}
 
             else:
                 new_obj = {'question': obj['question'],
@@ -72,7 +72,7 @@ def read_from_svamp(dataset_file_path: str, split:str):
         hf_data.save_to_disk(hf_data_cached_file_name)
     return hf_data
 
-def read_from_dataset(dataset_file_path: str, split:str):
+def read_from_dataset(dataset_file_path: str, split:str, direct_finetune: bool):
     """
     Read the dataset from the dataset file path
     :param dataset_file_path:
@@ -89,7 +89,7 @@ def read_from_dataset(dataset_file_path: str, split:str):
         logger.info(f"length of data: {len(data)} for split: {split}")
         new_data = []
         for obj in data:
-            if split == "train" and obj["score"] == 0:
+            if split == "train" and obj["score"] == 0 and (not direct_finetune):
                 ## we only use those correct one as training data.
                 continue
             if split == "train":
@@ -104,8 +104,8 @@ def read_from_dataset(dataset_file_path: str, split:str):
                              'answer': str(obj['extracted_answer']),
                              "raw_answer": obj['raw_answer'],
                              "chains": obj['chains'],
-                             "formated_code": obj["code"][0],
-                             "generated_code_string": obj["generation"][-1][0]}
+                             "formated_code": obj["code"][0]  if "code" in obj else "",
+                             "generated_code_string": obj["generation"][-1][0] if "generation" in obj else ""}
 
             else:
                 new_obj = {'question': obj['question'],
@@ -122,20 +122,28 @@ def read_from_dataset(dataset_file_path: str, split:str):
     return hf_data
 
 
-def tokenize_data(example_dict: Dict, tokenizer: PreTrainedTokenizer):
+def tokenize_data(example_dict: Dict, tokenizer: PreTrainedTokenizer,
+                  is_train:bool, direct_finetune: bool = False):
     features = {"input_ids": [], "attention_mask": [], "metadata":[]}
 
-    for question, code in zip(example_dict["question"], example_dict["generated_code_string"]):
-        if code != "":
-            res = tokenizer(question + " The resulting python solution: " +  code, truncation=True, max_length=512, return_attention_mask=True)
+    for question, code, answer, question in zip(example_dict["question"], example_dict["generated_code_string"],
+                                                example_dict["answer"], example_dict["question"]):
+        if direct_finetune:
+            if is_train:
+                res = tokenizer(f"{question} The answer is: {answer}", truncation=True, max_length=512, return_attention_mask=True)
+            else:
+                res = tokenizer(f"{question} The answer is: ", truncation=True, max_length=512, return_attention_mask=True)
         else:
-            res = tokenizer(question, truncation=True, max_length=512, return_attention_mask=True)
+            if code != "":
+                res = tokenizer(question + " The resulting python solution: " +  code, truncation=True, max_length=512, return_attention_mask=True)
+            else:
+                # testing.
+                res = tokenizer(question, truncation=True, max_length=512, return_attention_mask=True)
         features["input_ids"].append(res["input_ids"])
         features["attention_mask"].append(res["attention_mask"])
-
-    for answer, question in zip(example_dict["answer"], example_dict["question"]):
         metadata = {"question": question, "answer": answer}
         features["metadata"].append(metadata)
+
     return features
 
 def tokenize_data_with_prompt(example_dict: Dict, tokenizer: PreTrainedTokenizer, all_training_data: List[Dict]):

@@ -40,12 +40,12 @@ def parse_arguments(parser:argparse.ArgumentParser):
     parser.add_argument('--dev_num', type=int, default=-1, help="The number of development data, -1 means all data")
     parser.add_argument('--test_num', type=int, default=-1, help="The number of development data, -1 means all data")
     parser.add_argument('--num_proc', type=int, default=8, help="The number of development data, -1 means all data")
-    parser.add_argument('--max_length', type=int, default=400, help="max generation length")
+    parser.add_argument('--max_length', type=int, default=600, help="max generation length")
 
     parser.add_argument('--train_file', type=str, default="datasets/gsm8k/gsm8k_train_eval_result.json")
     parser.add_argument('--dev_file', type=str, default="datasets/gsm8k/gsm8k_test_sent_split.json")
     parser.add_argument('--test_file', type=str, default="none")
-
+    parser.add_argument('--dft', type=int, default=0, help="direct finetune without CoT/PAL")
 
     # model
     parser.add_argument('--seed', type=int, default=42, help="random seed")
@@ -185,14 +185,14 @@ def main():
 
     logger.info("[Data Info] Reading all data")
     if "svamp" in args.train_file:
-        dataset = read_from_svamp(dataset_file_path=args.train_file, split="train")
-        eval_dataset = read_from_svamp(dataset_file_path=args.dev_file, split="dev")
+        dataset = read_from_svamp(dataset_file_path=args.train_file, split="train", direct_finetune=bool(args.dft))
+        eval_dataset = read_from_svamp(dataset_file_path=args.dev_file, split="dev", direct_finetune=bool(args.dft))
     elif "gsm8k" in args.train_file:
-        dataset = read_from_dataset(dataset_file_path=args.train_file, split="train")
-        eval_dataset = read_from_dataset(dataset_file_path=args.dev_file, split="dev")
+        dataset = read_from_dataset(dataset_file_path=args.train_file, split="train", direct_finetune=bool(args.dft))
+        eval_dataset = read_from_dataset(dataset_file_path=args.dev_file, split="dev", direct_finetune=bool(args.dft))
     elif "MathQA" in args.train_file:
-        dataset = read_from_mathqa(dataset_file_path=args.train_file, split="train")
-        eval_dataset = read_from_mathqa(dataset_file_path=args.dev_file, split="dev")
+        dataset = read_from_mathqa(dataset_file_path=args.train_file, split="train", direct_finetune=bool(args.dft))
+        eval_dataset = read_from_mathqa(dataset_file_path=args.dev_file, split="dev", direct_finetune=bool(args.dft))
     if args.train_num > 0:
         dataset = dataset.select(range(args.train_num))
     if args.dev_num > 0:
@@ -202,7 +202,7 @@ def main():
     with accelerator.main_process_first():
         train_tokenized_data = dataset.map(
             function=tokenize_data,
-            fn_kwargs={"tokenizer": tokenizer},
+            fn_kwargs={"tokenizer": tokenizer, "is_train": True, "direct_finetune": bool(args.dft)},
             batched=True,
             load_from_cache_file=True,
             num_proc=args.num_proc,
@@ -210,7 +210,7 @@ def main():
         )
         eval_tokenized_dataset = eval_dataset.map(
             function=tokenize_data,
-            fn_kwargs={"tokenizer": tokenizer},
+            fn_kwargs={"tokenizer": tokenizer, "is_train": False, "direct_finetune": bool(args.dft)},
             batched=True,
             load_from_cache_file=True,
             num_proc=args.num_proc,
