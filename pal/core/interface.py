@@ -138,6 +138,11 @@ class ProgramInterface:
                 results.append(exec_result)
         counter = Counter(results)
         return code_snippets, counter.most_common(1)[0][0]
+
+    def run_formal(self, prompt: str, time_out: float = 10, temperature: float = 0.0, top_p: float = 1.0,
+            max_tokens: int = 512, majority_at: int = None):
+        code_snippets = self.generate(prompt, majority_at=majority_at, temperature=temperature, top_p=top_p, max_tokens=max_tokens)
+        return code_snippets
     
     def run_with_variables(self, prompt: str, variable_string: str, time_out: float =10, temperature: float =0.0, top_p: float =1.0, 
             max_tokens: int =512, majority_at: int =None):

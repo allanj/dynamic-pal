@@ -146,8 +146,12 @@ def evaluate(args, runtime:GenericRuntime, valid_dataloader: DataLoader, model: 
     all_data = []
     for idx, (prediction, metadata) in enumerate(zip(predictions, all_metadata)):
         try:
-            predicted_code = prediction.split("The resulting python solution: ")[1]
-            code, ans = run_code(runtime=runtime, code_gen=predicted_code, answer_expr="solution()")
+            if args.dft:
+                code = ""
+                ans = prediction.split("The answer is: ")[1]
+            else:
+                predicted_code = prediction.split("The resulting python solution: ")[1]
+                code, ans = run_code(runtime=runtime, code_gen=predicted_code, answer_expr="solution()")
         except:
             predicted_code = "<split failed>"
             code = ""

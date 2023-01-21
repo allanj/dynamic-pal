@@ -41,6 +41,8 @@ def prompt_emb(input_file, output_file, dataset_name,
             question = obj['question'] if 'question' in obj else obj['sQuestion'].strip() ## for svamp
         elif dataset_name == "MathQA":
             question = obj["Problem"].strip()
+        elif dataset_name == "ssat":
+            question = obj["question"].strip()
         else:
             raise NotImplementedError
         success = False
@@ -103,3 +105,10 @@ if __name__ == '__main__':
         prompt_emb(input_file="datasets/MathQA/mathqa_test_nodup_our_filtered.json",
                    output_file=f"datasets/MathQA/mathqa_test_emb_{suffix}.npy", dataset_name=dataset,
                    model_name= embedding_model_name, local_model=local_model)
+    elif dataset == "ssat":
+        prompt_emb(input_file="datasets/ssat/parsing_prelabel.json",
+                   output_file=f"datasets/ssat/parsing_prelabel.npy", dataset_name=dataset,
+                   model_name=embedding_model_name, local_model=local_model)
+        prompt_emb(input_file="datasets/ssat/parsing_samples.json",
+                   output_file=f"datasets/ssat/parsing_samples.npy", dataset_name=dataset,
+                   model_name=embedding_model_name, local_model=local_model)

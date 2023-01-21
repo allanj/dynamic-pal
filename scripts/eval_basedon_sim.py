@@ -75,17 +75,20 @@ def find_top_k_prompt(test_sent_embs: np.array, test_question_idx: int, train_se
             sorted_idx = sorted_idx[::-1]
         else:
             pass
-        top_k_idx = []
-        cursor = 0
-        have_score_not_1 = False
-        while len(top_k_idx) < k:
-            ## only accept the data that have score == 1
-            if training_data[sorted_idx[cursor]]['score'] == 1:
-                # print(sim[sorted_idx[cursor]])
-                top_k_idx.append(sorted_idx[cursor])
-            else:
-                have_score_not_1 = True
-            cursor += 1
+        if "score" in training_data[0]:
+            top_k_idx = []
+            cursor = 0
+            have_score_not_1 = False
+            while len(top_k_idx) < k:
+                ## only accept the data that have score == 1
+                if 'score' in training_data[sorted_idx[cursor]] and training_data[sorted_idx[cursor]]['score'] == 1:
+                    # print(sim[sorted_idx[cursor]])
+                    top_k_idx.append(sorted_idx[cursor])
+                else:
+                    have_score_not_1 = True
+                cursor += 1
+        else:
+            top_k_idx = sorted_idx[:k]
     else:
         ## normal prompts
         return None
@@ -112,6 +115,24 @@ def construct_prompt_based_on_top_k_prompt(training_data, top_k_idx, test_questi
     prompt += "Q: " + test_data[test_question_idx][test_question_key].strip() + "\n\n" + "# solution in Python:\n\n\n"
     return prompt
 
+def construct_formal_prompt_based_on_top_k_prompt(training_data, top_k_idx, test_question_idx, test_data, test_question_key):
+    """
+    construct the prompt based on the top k training question idx
+    :param training_data:
+    :param top_k_idx:
+    :param test_question_idx:
+    :return:
+    """
+    prompt = ""
+    for idx in top_k_idx:
+
+        train_question = training_data[idx][test_question_key].strip()
+        prompt += "Q: " + train_question + "\n" + "Parsing results for the above question:\n"
+        prompt +=  training_data[idx]['formal'].strip() + "\n# End of parsing\n\n\n"
+
+    prompt += "Q: " + test_data[test_question_idx][test_question_key].strip() + "\n" + "# Parsing results for the above question:\n"
+    return prompt
+
 
 def inference(args,
               examples,
@@ -128,23 +149,36 @@ def inference(args,
         top_k_idx = find_top_k_prompt(test_sent_embs=test_sent_embs,
                                       test_question_idx = idx,
                                       train_sent_embs = train_sent_embs,
-                                      training_data=training_data, k=8,
+                                      training_data=training_data, k=12,
                                       similarity_order=args.similarity_order)
         if top_k_idx is None:
             ## means using normal index.
             question = x[test_question_key]
             current_prompt = math_prompts.MATH_PROMPT.format(question=question)
         else:
-            current_prompt = construct_prompt_based_on_top_k_prompt(training_data=training_data,
-                                                                    top_k_idx=top_k_idx,
-                                                                    test_question_idx=idx,
-                                                                    test_data=examples, test_question_key=test_question_key)
+            if answer_key is None:
+                current_prompt = construct_formal_prompt_based_on_top_k_prompt(training_data=training_data,
+                                                                        top_k_idx=top_k_idx,
+                                                                        test_question_idx=idx,
+                                                                        test_data=examples, test_question_key=test_question_key)
+            else:
+                current_prompt = construct_prompt_based_on_top_k_prompt(training_data=training_data,
+                                                                        top_k_idx=top_k_idx,
+                                                                        test_question_idx=idx,
+                                                                        test_data=examples, test_question_key=test_question_key)
         try:
-            code, ans = itf.run(current_prompt, majority_at=args.majority_at,
-                                temperature=args.temperature, top_p=args.top_p,
-                                max_tokens=args.max_tokens)
-            ans = float(ans)
-            score = 1 if abs(ans - float(x[answer_key])) < 1e-2 else 0
+            if answer_key is None:
+                code = itf.run_formal(current_prompt, majority_at=args.majority_at,
+                                    temperature=args.temperature, top_p=args.top_p,
+                                    max_tokens=args.max_tokens)
+                ans = ''
+                score = 0
+            else:
+                code, ans = itf.run(current_prompt, majority_at=args.majority_at,
+                                    temperature=args.temperature, top_p=args.top_p,
+                                    max_tokens=args.max_tokens)
+                ans = float(ans)
+                score = 1 if abs(ans - float(x[answer_key])) < 1e-2 else 0
         except Exception as e:
             print(e)
             code = ''
@@ -196,6 +230,14 @@ if __name__ == '__main__':
             test_sent_embs = np.load(f'datasets/{dataset_folder}/mathqa_test_emb_{emb_suffix}.npy')
         test_question_key = "Problem"
         answer_key = "answer"
+    elif dataset_folder == "ssat":
+        DATA_PATH = f'datasets/{dataset_folder}/parsing_prelabel.json'
+        if args.similarity_order != 'no_similarity':
+            training_data = read_data(f'datasets/{dataset_folder}/parsing_samples.json')
+            train_sent_embs = np.load(f'datasets/{dataset_folder}/parsing_samples.npy')
+            test_sent_embs = np.load(f'datasets/{dataset_folder}/parsing_prelabel.npy')
+        test_question_key = "question"
+        answer_key = None
     else:
         raise ValueError("dataset not found")
 

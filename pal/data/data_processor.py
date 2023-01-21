@@ -20,7 +20,7 @@ def read_from_mathqa(dataset_file_path: str, split:str, direct_finetune: bool):
         logger.info(f"length of data: {len(data)} for split: {split}")
         new_data = []
         for obj in data:
-            if split == "train" and obj["score"] == 0 and (not direct_finetune):
+            if split == "train" and (not direct_finetune) and obj["score"] == 0:
                 ## we only use those correct one as training data.
                 continue
             if split == "train":
@@ -51,7 +51,7 @@ def read_from_svamp(dataset_file_path: str, split:str, direct_finetune: bool):
         logger.info(f"length of data: {len(data)} for split: {split}")
         new_data = []
         for obj in data:
-            if split == "train" and obj["score"] == 0 and (not direct_finetune):
+            if split == "train" and (not direct_finetune) and obj["score"] == 0:
                 ## we only use those correct one as training data.
                 continue
             if split == "train":
@@ -89,7 +89,7 @@ def read_from_dataset(dataset_file_path: str, split:str, direct_finetune: bool):
         logger.info(f"length of data: {len(data)} for split: {split}")
         new_data = []
         for obj in data:
-            if split == "train" and obj["score"] == 0 and (not direct_finetune):
+            if split == "train" and (not direct_finetune) and obj["score"] == 0:
                 ## we only use those correct one as training data.
                 continue
             if split == "train":
@@ -97,8 +97,8 @@ def read_from_dataset(dataset_file_path: str, split:str, direct_finetune: bool):
                 assert str(obj['extracted_answer']) != ""
                 assert str(obj['raw_answer']) != ""
                 assert str(obj['chains']) != ""
-                assert str(obj["code"][0]) != ""
-                assert str(obj["generation"][-1][0]) != ""
+                # assert str(obj["code"][0]) != ""
+                # assert str(obj["generation"][-1][0]) != ""
 
                 new_obj = {'question': obj['question'],
                              'answer': str(obj['extracted_answer']),
