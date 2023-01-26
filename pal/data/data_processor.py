@@ -104,8 +104,8 @@ def read_from_dataset(dataset_file_path: str, split:str, direct_finetune: bool):
                              'answer': str(obj['extracted_answer']),
                              "raw_answer": obj['raw_answer'],
                              "chains": obj['chains'],
-                             "formated_code": obj["code"][0]  if "code" in obj else "",
-                             "generated_code_string": obj["generation"][-1][0] if "generation" in obj else ""}
+                             "formated_code": obj["code"][-1]  if "code" in obj else "",
+                             "generated_code_string": obj["generation"][-1][0].strip() if "generation" in obj else ""}
 
             else:
                 new_obj = {'question': obj['question'],
@@ -123,7 +123,9 @@ def read_from_dataset(dataset_file_path: str, split:str, direct_finetune: bool):
 
 
 def tokenize_data(example_dict: Dict, tokenizer: PreTrainedTokenizer,
-                  is_train:bool, direct_finetune: bool = False):
+                  is_train:bool,
+                  direct_finetune: bool = False,
+                  cot_finetune: bool = False):
     features = {"input_ids": [], "attention_mask": [], "metadata":[]}
 
     for question, code, answer, question in zip(example_dict["question"], example_dict["generated_code_string"],
@@ -135,7 +137,10 @@ def tokenize_data(example_dict: Dict, tokenizer: PreTrainedTokenizer,
                 res = tokenizer(f"{question} The answer is: ", truncation=True, max_length=512, return_attention_mask=True)
         else:
             if code != "":
-                res = tokenizer(question + " The resulting python solution: " +  code, truncation=True, max_length=512, return_attention_mask=True)
+                if cot_finetune:
+                    res = tokenizer("Q: " + question + "\nA: " + code, truncation=True, max_length=512, return_attention_mask=True)
+                else:
+                    res = tokenizer(question + " The resulting python solution: " +  code, truncation=True, max_length=512, return_attention_mask=True)
             else:
                 # testing.
                 res = tokenizer(question, truncation=True, max_length=512, return_attention_mask=True)

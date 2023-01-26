@@ -46,6 +46,7 @@ def parse_arguments(parser:argparse.ArgumentParser):
     parser.add_argument('--dev_file', type=str, default="datasets/gsm8k/gsm8k_test_sent_split.json")
     parser.add_argument('--test_file', type=str, default="none")
     parser.add_argument('--dft', type=int, default=0, help="direct finetune without CoT/PAL")
+    parser.add_argument('--cot_ft', type=int, default=0, help="use chain-of-thought prompt to finetune, need to change train file name")
 
     # model
     parser.add_argument('--seed', type=int, default=42, help="random seed")
@@ -150,14 +151,19 @@ def evaluate(args, runtime:GenericRuntime, valid_dataloader: DataLoader, model: 
                 code = ""
                 ans = prediction.split("The answer is: ")[1]
             else:
-                predicted_code = prediction.split("The resulting python solution: ")[1]
-                code, ans = run_code(runtime=runtime, code_gen=predicted_code, answer_expr="solution()")
+                if args.cot_ft:
+                    code = prediction.split("\nA: ")[1]
+                    ans = prediction.split("The answer is ")[1]
+                    if ans.endswith("."):
+                        ans = ans[:-1]
+                else:
+                    predicted_code = prediction.split("The resulting python solution: ")[1]
+                    code, ans = run_code(runtime=runtime, code_gen=predicted_code, answer_expr="solution()")
         except:
             predicted_code = "<split failed>"
             code = ""
             ans = None
         score = 0
-        # TODO: use float to measure
         try:
             numeric_ans = float(ans)
         except:
@@ -206,7 +212,9 @@ def main():
     with accelerator.main_process_first():
         train_tokenized_data = dataset.map(
             function=tokenize_data,
-            fn_kwargs={"tokenizer": tokenizer, "is_train": True, "direct_finetune": bool(args.dft)},
+            fn_kwargs={"tokenizer": tokenizer, "is_train": True,
+                       "direct_finetune": bool(args.dft),
+                       "cot_finetune": bool(args.cot_ft)},
             batched=True,
             load_from_cache_file=True,
             num_proc=args.num_proc,
@@ -214,7 +222,8 @@ def main():
         )
         eval_tokenized_dataset = eval_dataset.map(
             function=tokenize_data,
-            fn_kwargs={"tokenizer": tokenizer, "is_train": False, "direct_finetune": bool(args.dft)},
+            fn_kwargs={"tokenizer": tokenizer, "is_train": False, "direct_finetune": bool(args.dft),
+                       "cot_finetune": bool(args.cot_ft)},
             batched=True,
             load_from_cache_file=True,
             num_proc=args.num_proc,
