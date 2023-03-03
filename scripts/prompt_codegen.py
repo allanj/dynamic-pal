@@ -35,7 +35,7 @@ def parse_arguments(parser:argparse.ArgumentParser):
     # data Hyperparameters
     parser.add_argument('--batch_size', type=int, default=8)
     parser.add_argument('--lm_model_name', type=str, default="codegen-6B-mono")
-
+    parser.add_argument('--base_model_dir', type=str, default=None)
     args = parser.parse_args()
     # Print out the arguments
     for k in args.__dict__:
@@ -83,11 +83,20 @@ tqdm = partial(tqdm, bar_format='{l_bar}{bar:10}{r_bar}{bar:-10b}', disable=not 
 
 dataset_file = "datasets/gsm8k/gsm8k_test_sent_split.json"
 sub_model_name = args.lm_model_name
-lm_model_name = f"Salesforce/{sub_model_name}"
+if args.base_model_dir.strip() != '':
+    lm_model_name = f"{args.base_model_dir}/{sub_model_name}"
+else:
+    lm_model_name = args.sub_model_name
+batch_size = args.batch_size
 batch_size = args.batch_size
 
 tokenizer = AutoTokenizer.from_pretrained(lm_model_name, use_fast=True)
+tokenizer.pad_token_id = tokenizer.eos_token_id = 2
+if sub_model_name != 'galactica-13b':
+    additional_special_tokens = [' '*i for i in range(2,31)]
+    num_added_toks = tokenizer.add_special_tokens({'additional_special_tokens': additional_special_tokens}, replace_additional_special_tokens=False)
 model = AutoModelForCausalLM.from_pretrained(lm_model_name, pad_token_id=tokenizer.eos_token_id, low_cpu_mem_usage=True)
+model.resize_token_embeddings(len(tokenizer))
 collator = PaddedDataCollator(tokenizer)
 optimizer = torch.optim.AdamW(model.parameters(), lr=1e-5)
 
@@ -138,8 +147,19 @@ for index, feature in tqdm(enumerate(loader), desc="--validation", total=len(loa
             all_ids.append(gen_ids)
         # generated_ids = generated_ids[0, len(feature["input_ids"][0]):]
         # prediction = tokenizer.decode(generated_ids, skip_special_tokens=True, clean_up_tokenization_spaces=False)
-        prediction_code_gen = tokenizer.batch_decode(all_ids, skip_special_tokens=True, clean_up_tokenization_spaces=False)
+        if sub_model_name != 'galactica-1.3b':
+            prediction_code_gen = tokenizer.batch_decode(all_ids, skip_special_tokens=False, clean_up_tokenization_spaces=False)
+            prediction_code_gen = [code.split('Q:')[0] for code in prediction_code_gen]
+        else:
+            prediction_code_gen = tokenizer.batch_decode(all_ids, skip_special_tokens=True, clean_up_tokenization_spaces=False)
         all_code.extend(prediction_code_gen)
+
+
+# Post process code
+# import json
+# data = json.load(open('results/gsm8k_test_sent_split_prompt_math_corpus_v3_galactica-1.3b_seqlen_2048_global_step_75000.json','r'))
+# all_code = [ item['predicted_code'].split('Q:')[0] for item in data]
+
 
 new_data = []
 for idx, current_predicted_code in enumerate(all_code):

@@ -31,7 +31,7 @@ def parse_arguments(parser:argparse.ArgumentParser):
     # data Hyperparameters
     parser.add_argument('--batch_size', type=int, default=8)
     parser.add_argument('--lm_model_name', type=str, default="codegen-6B-mono")
-
+    parser.add_argument('--base_model_dir', type=str, default=None)
     args = parser.parse_args()
     # Print out the arguments
     for k in args.__dict__:
@@ -79,7 +79,10 @@ tqdm = partial(tqdm, bar_format='{l_bar}{bar:10}{r_bar}{bar:-10b}', disable=not 
 
 dataset_file = "datasets/ssat/ssat_test_questions_no_image.json"
 sub_model_name = args.lm_model_name
-lm_model_name = f"Salesforce/{sub_model_name}"
+if args.base_model_dir.strip() != '':
+    lm_model_name = f"{args.base_model_dir}/{sub_model_name}"
+else:
+    lm_model_name = args.sub_model_name
 batch_size = args.batch_size
 
 tokenizer = AutoTokenizer.from_pretrained(lm_model_name, use_fast=True)
