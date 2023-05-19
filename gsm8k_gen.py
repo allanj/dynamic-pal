@@ -42,15 +42,15 @@ def parse_arguments(parser:argparse.ArgumentParser):
     parser.add_argument('--num_proc', type=int, default=8, help="The number of development data, -1 means all data")
     parser.add_argument('--max_length', type=int, default=600, help="max generation length")
 
-    parser.add_argument('--train_file', type=str, default="datasets/gsm8k/gsm8k_train_eval_result.json")
-    parser.add_argument('--dev_file', type=str, default="datasets/gsm8k/gsm8k_test_sent_split.json")
+    parser.add_argument('--train_file', type=str, default="datasets/svamp/travel_eval_results.json")
+    parser.add_argument('--dev_file', type=str, default="datasets/svamp/testset_nodup.json")
     parser.add_argument('--test_file', type=str, default="none")
     parser.add_argument('--dft', type=int, default=0, help="direct finetune without CoT/PAL")
     parser.add_argument('--cot_ft', type=int, default=0, help="use chain-of-thought prompt to finetune, need to change train file name")
 
     # model
     parser.add_argument('--seed', type=int, default=42, help="random seed")
-    parser.add_argument('--model_folder', type=str, default="gsm8k_finetune", help="the name of the models, to save the model")
+    parser.add_argument('--model_folder', type=str, default="svamp_program_sft", help="the name of the models, to save the model")
     parser.add_argument('--bert_folder', type=str, default="Salesforce", help="The folder name that contains the BERT model")
     parser.add_argument('--bert_model_name', type=str, default="codegen-350M-mono", help="The bert model name to used")
 
@@ -97,7 +97,7 @@ def train(args, model, train_dataloader: DataLoader, num_epochs: int,
         total_loss = 0
         model.train()
         for iter, feature in tqdm(enumerate(train_dataloader, 1), desc="--training batch", total=len(train_dataloader)):
-            optimizer.zero_grad()
+            optimizer.zero_grad(set_to_none=True)
             with torch.cuda.amp.autocast(enabled=bool(args.fp16)):
                 loss = model(**feature).loss
             accelerator.backward(loss)
@@ -105,7 +105,6 @@ def train(args, model, train_dataloader: DataLoader, num_epochs: int,
             total_loss += loss.item()
             optimizer.step()
             scheduler.step()
-            model.zero_grad()
             if iter % 1000 == 0:
                 logger.info(f"epoch: {epoch}, iteration: {iter}, current mean loss: {total_loss/iter:.2f}")
         logger.info(f"Finish epoch: {epoch}, loss: {total_loss:.2f}, mean loss: {total_loss/len(train_dataloader):.2f}")
@@ -141,15 +140,17 @@ def evaluate(args, runtime:GenericRuntime, valid_dataloader: DataLoader, model: 
                                                 return_dict_in_generate=True).sequences
                 generated_ids = accelerator.pad_across_processes(generated_ids, dim=1, pad_index=tokenizer.eos_token_id)
                 generated_ids = accelerator.gather_for_metrics(generated_ids)
+                generated_ids = generated_ids[:, feature["input_ids"].size(1):]
                 prediction = tokenizer.batch_decode(generated_ids, skip_special_tokens=True, clean_up_tokenization_spaces=False)
                 predictions.extend(prediction)
+
     correct = 0
     all_data = []
     for idx, (prediction, metadata) in enumerate(zip(predictions, all_metadata)):
         try:
             if args.dft:
                 code = ""
-                ans = prediction.split("The answer is: ")[1]
+                ans = prediction
             else:
                 if args.cot_ft:
                     code = prediction.split("\nA: ")[1]
@@ -157,7 +158,7 @@ def evaluate(args, runtime:GenericRuntime, valid_dataloader: DataLoader, model: 
                     if ans.endswith("."):
                         ans = ans[:-1]
                 else:
-                    predicted_code = prediction.split("The resulting python solution: ")[1]
+                    predicted_code = prediction
                     code, ans = run_code(runtime=runtime, code_gen=predicted_code, answer_expr="solution()")
         except:
             predicted_code = "<split failed>"
@@ -168,7 +169,7 @@ def evaluate(args, runtime:GenericRuntime, valid_dataloader: DataLoader, model: 
             numeric_ans = float(ans)
         except:
             numeric_ans = None
-        if numeric_ans is not None and math.fabs(numeric_ans -  float(metadata["answer"])) < 1e-2:
+        if numeric_ans is not None and math.fabs(numeric_ans - float(metadata["answer"])) < 1e-2:
             correct += 1
             score = 1
         all_data.append({"question": metadata["question"],
@@ -211,19 +212,20 @@ def main():
     logger.info(f"[Data Info] Tokenizzing the dataset")
     with accelerator.main_process_first():
         train_tokenized_data = dataset.map(
-            function=tokenize_data,
-            fn_kwargs={"tokenizer": tokenizer, "is_train": True,
-                       "direct_finetune": bool(args.dft),
-                       "cot_finetune": bool(args.cot_ft)},
+            lambda x: tokenize_data(x, tokenizer=tokenizer, is_train=True,
+                                    direct_finetune=bool(args.dft),
+                                    cot_finetune=bool(args.cot_ft),
+                                    max_length=args.max_length),
             batched=True,
             load_from_cache_file=True,
             num_proc=args.num_proc,
             remove_columns=dataset.column_names
         )
         eval_tokenized_dataset = eval_dataset.map(
-            function=tokenize_data,
-            fn_kwargs={"tokenizer": tokenizer, "is_train": False, "direct_finetune": bool(args.dft),
-                       "cot_finetune": bool(args.cot_ft)},
+            lambda x: tokenize_data(x, tokenizer=tokenizer, is_train=False,
+                                    direct_finetune=bool(args.dft),
+                                    cot_finetune=bool(args.cot_ft),
+                                    max_length=args.max_length),
             batched=True,
             load_from_cache_file=True,
             num_proc=args.num_proc,

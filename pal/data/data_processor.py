@@ -124,28 +124,45 @@ def read_from_dataset(dataset_file_path: str, split:str, direct_finetune: bool):
 
 def tokenize_data(example_dict: Dict, tokenizer: PreTrainedTokenizer,
                   is_train:bool,
+                  max_length:int,
                   direct_finetune: bool = False,
                   cot_finetune: bool = False):
-    features = {"input_ids": [], "attention_mask": [], "metadata":[]}
+    features = {"input_ids": [], "attention_mask": [], "source_len": [], "metadata":[]}
 
     for question, code, answer, question in zip(example_dict["question"], example_dict["generated_code_string"],
                                                 example_dict["answer"], example_dict["question"]):
         if direct_finetune:
-            if is_train:
-                res = tokenizer(f"{question} The answer is: {answer}", truncation=True, max_length=512, return_attention_mask=True)
-            else:
-                res = tokenizer(f"{question} The answer is: ", truncation=True, max_length=512, return_attention_mask=True)
+            source_text = f"Question: {question}\nAnswer: "
+            source_res = tokenizer(source_text, return_attention_mask=False)
+            source_ids = source_res["input_ids"]
+            source_length = len(source_ids)
+
+            answer_text = answer if is_train else ""
+            answer_res = tokenizer(answer_text, return_attention_mask=False)
+            answer_ids = answer_res["input_ids"]
+
+            input_ids = source_ids + answer_ids
         else:
-            if code != "":
-                if cot_finetune:
-                    res = tokenizer("Q: " + question + "\nA: " + code, truncation=True, max_length=512, return_attention_mask=True)
-                else:
-                    res = tokenizer(question + " The resulting python solution: " +  code, truncation=True, max_length=512, return_attention_mask=True)
+            if cot_finetune:
+                source_text = f"Question: {question}\nAnswer: "
             else:
-                # testing.
-                res = tokenizer(question, truncation=True, max_length=512, return_attention_mask=True)
-        features["input_ids"].append(res["input_ids"])
-        features["attention_mask"].append(res["attention_mask"])
+                source_text = f"Question: {question}\n# The resulting Python solution\n"
+            answer_text = code if is_train else ""
+            source_res = tokenizer(source_text, return_attention_mask=False)
+            answer_res = tokenizer(answer_text, return_attention_mask=False)
+            source_ids = source_res["input_ids"]
+            answer_ids = answer_res["input_ids"]
+            input_ids = source_ids + answer_ids
+            source_length = len(source_ids)
+        if is_train:
+            input_ids = input_ids + [tokenizer.eos_token_id]
+        input_ids = input_ids[:max_length]
+        attention_mask = [1] * len(input_ids)
+        if source_length > max_length:
+            source_length = max_length
+        features["input_ids"].append(input_ids)
+        features["attention_mask"].append(attention_mask)
+        features["source_len"].append(source_length)
         metadata = {"question": question, "answer": answer}
         features["metadata"].append(metadata)
 
@@ -188,7 +205,7 @@ class PaddedDataCollator:
             # change to left padding
             input_ids = [self.tokenizer.eos_token_id] * (max_input_length - len(feature["input_ids"])) + feature["input_ids"]
             attention_mask = [0] * (max_input_length - len(feature["attention_mask"])) + feature["attention_mask"]
-            labels = [-100] * (max_input_length - len(feature["input_ids"])) + feature["input_ids"]
+            labels = [-100] * (max_input_length - len(input_ids) + feature["source_len"]) + input_ids[feature["source_len"]:]
             batch["input_ids"].append(input_ids)
             batch["attention_mask"].append(attention_mask)
             batch["labels"].append(labels)

@@ -38,13 +38,14 @@ def write_data(file: str, data) -> None:
 parser = argparse.ArgumentParser()
 parser.add_argument('--append', action='store_true')
 parser.add_argument('--verbose', action='store_true')
-parser.add_argument('--dataset', default='gsm8k', type=str)
+parser.add_argument('--dataset', default='ssat', type=str)
 parser.add_argument('--majority_at', default=1, type=int)
 parser.add_argument('--temperature', default=0.0, type=float)
 parser.add_argument('--top_p', default=1.0, type=float)
 parser.add_argument('--max_tokens', default=600, type=int)
 parser.add_argument('--similarity_order', default='most_similar', type=str, choices=['most_similar', 'least_similar', 'random', 'no_similarity'])
 parser.add_argument('--emb_model', default='text-embedding-ada-002', type=str)
+parser.add_argument('--top_k_prompt', default=12, type=int)
 
 
 def find_top_k_prompt(test_sent_embs: np.array, test_question_idx: int, train_sent_embs: np.array, training_data, k= 8,
@@ -127,7 +128,7 @@ def construct_formal_prompt_based_on_top_k_prompt(training_data, top_k_idx, test
     for idx in top_k_idx:
 
         train_question = training_data[idx][test_question_key].strip()
-        prompt += "Q: " + train_question + "\n" + "Parsing results for the above question:\n"
+        prompt += "Q: " + train_question + "\n" + "# Parsing results for the above question:\n"
         prompt +=  training_data[idx]['formal'].strip() + "\n# End of parsing\n\n\n"
 
     prompt += "Q: " + test_data[test_question_idx][test_question_key].strip() + "\n" + "# Parsing results for the above question:\n"
@@ -149,13 +150,18 @@ def inference(args,
         top_k_idx = find_top_k_prompt(test_sent_embs=test_sent_embs,
                                       test_question_idx = idx,
                                       train_sent_embs = train_sent_embs,
-                                      training_data=training_data, k=12,
+                                      training_data=training_data, k=args.top_k_prompt,
                                       similarity_order=args.similarity_order)
+
         if top_k_idx is None:
             ## means using normal index.
             question = x[test_question_key]
             current_prompt = math_prompts.MATH_PROMPT.format(question=question)
         else:
+            result["similar_questions"] = []
+            for tkidx in top_k_idx:
+                train_question = training_data[tkidx][test_question_key].strip()
+                result["similar_questions"].append([train_question, training_data[tkidx]['formal'].strip()])
             if answer_key is None:
                 current_prompt = construct_formal_prompt_based_on_top_k_prompt(training_data=training_data,
                                                                         top_k_idx=top_k_idx,
@@ -210,16 +216,18 @@ if __name__ == '__main__':
     emb_suffix = args.emb_model
     if dataset_folder == "gsm8k":
         DATA_PATH = f'datasets/{dataset_folder}/gsm8k_test_sent_split.json'
-        training_data = read_data(f'datasets/{dataset_folder}/gsm8k_train_eval_result_expanded_1.json')
-        train_sent_embs = np.load(f'datasets/{dataset_folder}/gsm8k_train_sent_emb_{emb_suffix}.npy')
-        test_sent_embs = np.load(f'datasets/{dataset_folder}/gsm8k_test_sent_emb_{emb_suffix}.npy')
+        if args.similarity_order != 'no_similarity':
+            training_data = read_data(f'datasets/{dataset_folder}/gsm8k_train_eval_result_expanded_1.json')
+            train_sent_embs = np.load(f'datasets/{dataset_folder}/gsm8k_train_sent_emb_{emb_suffix}.npy')
+            test_sent_embs = np.load(f'datasets/{dataset_folder}/gsm8k_test_sent_emb_{emb_suffix}.npy')
         test_question_key = "question"
         answer_key = 'extracted_answer'
     elif dataset_folder == "svamp":
         DATA_PATH = f'datasets/{dataset_folder}/testset_nodup.json'
-        training_data = read_data(f'datasets/{dataset_folder}/train_eval_result.json')
-        train_sent_embs = np.load(f'datasets/{dataset_folder}/trainset_{emb_suffix}.npy')
-        test_sent_embs = np.load(f'datasets/{dataset_folder}/testset_{emb_suffix}.npy')
+        if args.similarity_order != 'no_similarity':
+            training_data = read_data(f'datasets/{dataset_folder}/train_eval_result.json')
+            train_sent_embs = np.load(f'datasets/{dataset_folder}/trainset_{emb_suffix}.npy')
+            test_sent_embs = np.load(f'datasets/{dataset_folder}/testset_{emb_suffix}.npy')
         test_question_key = "question"
         answer_key = "answer"
     elif dataset_folder == "MathQA":
@@ -231,11 +239,13 @@ if __name__ == '__main__':
         test_question_key = "Problem"
         answer_key = "answer"
     elif dataset_folder == "ssat":
-        DATA_PATH = f'datasets/{dataset_folder}/parsing_prelabel.json'
+        DATA_PATH = f'datasets/{dataset_folder}/sat_prelabel.json'
         if args.similarity_order != 'no_similarity':
             training_data = read_data(f'datasets/{dataset_folder}/parsing_samples.json')
             train_sent_embs = np.load(f'datasets/{dataset_folder}/parsing_samples.npy')
-            test_sent_embs = np.load(f'datasets/{dataset_folder}/parsing_prelabel.npy')
+            assert len(train_sent_embs) == len(training_data)
+            test_sent_embs = np.load(f'datasets/{dataset_folder}/sat_prelabel.npy')
+            assert len(test_sent_embs) == len(read_data(DATA_PATH))
         test_question_key = "question"
         answer_key = None
     else:

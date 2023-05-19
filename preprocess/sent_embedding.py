@@ -17,7 +17,7 @@ name2model = {
 }
 
 def parse_arguments(parser):
-    parser.add_argument('--dataset', default='gsm8k', type=str, choices=["gsm8k", "svamp", "MathQA"])
+    parser.add_argument('--dataset', default='ssat', type=str, choices=["gsm8k", "svamp", "MathQA", "ssat"])
     parser.add_argument('--embedding_model_name', default='text-embedding-ada-002', type=str)
     args = parser.parse_args()
     # Print out the arguments
@@ -106,9 +106,12 @@ if __name__ == '__main__':
                    output_file=f"datasets/MathQA/mathqa_test_emb_{suffix}.npy", dataset_name=dataset,
                    model_name= embedding_model_name, local_model=local_model)
     elif dataset == "ssat":
-        prompt_emb(input_file="datasets/ssat/parsing_prelabel.json",
-                   output_file=f"datasets/ssat/parsing_prelabel.npy", dataset_name=dataset,
+        prompt_emb(input_file="datasets/ssat/parsing_prelabel_v1.json",
+                   output_file=f"datasets/ssat/parsing_prelabel_v1.npy", dataset_name=dataset,
                    model_name=embedding_model_name, local_model=local_model)
-        prompt_emb(input_file="datasets/ssat/parsing_samples.json",
-                   output_file=f"datasets/ssat/parsing_samples.npy", dataset_name=dataset,
+        # prompt_emb(input_file="datasets/ssat/sat_prelabel.json",
+        #            output_file=f"datasets/ssat/sat_prelabel.npy", dataset_name=dataset,
+        #            model_name=embedding_model_name, local_model=local_model)
+        prompt_emb(input_file="datasets/ssat/parsing_samples_v1.json",
+                   output_file=f"datasets/ssat/parsing_samples_v1.npy", dataset_name=dataset,
                    model_name=embedding_model_name, local_model=local_model)

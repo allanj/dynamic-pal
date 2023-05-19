@@ -20,7 +20,7 @@ import tqdm
 import os
 
 from pal import interface
-from pal.prompt import math_prompts
+from pal.prompt import math_parse_prompts
 
 def read_data(file: str):
     with open(file, "r", encoding='utf-8') as read_file:
@@ -34,14 +34,18 @@ parser.add_argument('--majority_at', default=None, type=int)
 parser.add_argument('--temperature', default=0.0, type=float)
 parser.add_argument('--top_p', default=1.0, type=float)
 parser.add_argument('--max_tokens', default=600, type=int)
-parser.add_argument('--dataset_folder', default="svamp", choices=["svamp", "MathQA"], type=str)
+parser.add_argument('--dataset_folder', default="gsm8k", choices=["gsm8k","svamp", "MathQA"], type=str)
+parser.add_argument('--max_sample_freq', default=1, type=int)
 args = parser.parse_args()
 
 dataset_folder = args.dataset_folder
 
-DATA_PATH = f'datasets/{dataset_folder}/trainset_nodup.json'
-if dataset_folder == "MathQA":
+if dataset_folder == "gsm8k":
+    DATA_PATH = f'datasets/{dataset_folder}/gsm8k_train_sent_split.json'
+elif dataset_folder == "MathQA":
     DATA_PATH = f'datasets/{dataset_folder}/mathqa_train_nodup_our_filtered.json'
+elif dataset_folder == "svamp":
+    DATA_PATH = f'datasets/{dataset_folder}/trainset_nodup.json'
 
 result_folder = "results"
 os.makedirs(result_folder, exist_ok=True)
@@ -63,7 +67,7 @@ def write_data(file: str, data) -> None:
 all_data = []
 scores = []
 for x in tqdm.tqdm(examples, total=len(examples), desc="prompting"):
-    question = x['Problem'].strip()
+    question = x['question'].strip()
     result = copy.copy(x)
 
     solved = False
@@ -71,12 +75,12 @@ for x in tqdm.tqdm(examples, total=len(examples), desc="prompting"):
     run_count = 0
     while not solved:
         try:
-            code, ans = itf.run(math_prompts.MATH_PROMPT.format(
+            code, ans = itf.run(math_parse_prompts.MATH_PROMPT.format(
                 question=question.strip()), majority_at=args.majority_at,
                 temperature=temperature, top_p=args.top_p,
                 max_tokens=args.max_tokens)
             ans = float(ans)
-            score = 1 if abs(ans - float(x['answer'])) < 1e-2 else 0
+            score = 1 if abs(ans - float(x['extracted_answer'])) < 1e-2 else 0
             if score == 1:
                 solved = True
                 break
@@ -87,7 +91,7 @@ for x in tqdm.tqdm(examples, total=len(examples), desc="prompting"):
             score = 0
         temperature = 0.5
         run_count += 1
-        if run_count == 5:
+        if run_count == args.max_sample_freq:
             break
     scores.append(score)
 
@@ -99,6 +103,6 @@ for x in tqdm.tqdm(examples, total=len(examples), desc="prompting"):
 
     itf.clear_history()
     if len(all_data) % 20 == 0:
-        write_data(data=all_data, file=f"{result_folder}/{dataset_folder}_trainset_res_part_2.json")
-write_data(data=all_data, file=f"{result_folder}/{dataset_folder}_trainset_res_part_2.json")
+        write_data(data=all_data, file=f"{result_folder}/{dataset_folder}_trainset_eval_parse.json")
+write_data(data=all_data, file=f"{result_folder}/{dataset_folder}_trainset_eval_parse.json")
 print(f'Accuracy - {sum(scores) / len(scores)}')
