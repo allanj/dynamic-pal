@@ -146,7 +146,7 @@ def tokenize_data(example_dict: Dict, tokenizer: PreTrainedTokenizer,
             if cot_finetune:
                 source_text = f"Question: {question}\nAnswer: "
             else:
-                source_text = f"Question: {question}\n# The resulting Python solution\n"
+                source_text = f"Question: {question}\n\n# The resulting Python solution\n"
             answer_text = code if is_train else ""
             source_res = tokenizer(source_text, return_attention_mask=False)
             answer_res = tokenizer(answer_text, return_attention_mask=False)

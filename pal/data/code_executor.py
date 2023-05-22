@@ -8,7 +8,7 @@ from pal.core.interface import timeout
 def run_code(runtime, code_gen: str, answer_expr, time_out:float = 10):
     snippet = code_gen.split('\n')
     ## post process the code
-    updated_code_snippet = []
+    updated_code_snippet = ['import math', 'import sympy']
     for snippet_line in snippet:
         if snippet_line.startswith('def solution'):
             updated_code_snippet.append(snippet_line)

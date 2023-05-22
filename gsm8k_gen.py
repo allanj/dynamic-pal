@@ -34,7 +34,6 @@ tqdm = partial(tqdm, bar_format='{l_bar}{bar:10}{r_bar}{bar:-10b}', disable=not 
 
 def parse_arguments(parser:argparse.ArgumentParser):
     # data Hyperparameters
-    parser.add_argument('--device', type=str, default="cpu", choices=['cpu', 'cuda:0', 'cuda:1', 'cuda:2', 'cuda:3', 'cuda:4', 'cuda:5', 'cuda:6', 'cuda:7'], help="GPU/CPU devices")
     parser.add_argument('--batch_size', type=int, default=30)
     parser.add_argument('--train_num', type=int, default=-1, help="The number of training data, -1 means all data")
     parser.add_argument('--dev_num', type=int, default=-1, help="The number of development data, -1 means all data")
@@ -42,7 +41,7 @@ def parse_arguments(parser:argparse.ArgumentParser):
     parser.add_argument('--num_proc', type=int, default=8, help="The number of development data, -1 means all data")
     parser.add_argument('--max_length', type=int, default=600, help="max generation length")
 
-    parser.add_argument('--train_file', type=str, default="datasets/svamp/travel_eval_results.json")
+    parser.add_argument('--train_file', type=str, default="datasets/svamp/train_eval_results.json")
     parser.add_argument('--dev_file', type=str, default="datasets/svamp/testset_nodup.json")
     parser.add_argument('--test_file', type=str, default="none")
     parser.add_argument('--dft', type=int, default=0, help="direct finetune without CoT/PAL")
@@ -138,9 +137,10 @@ def evaluate(args, runtime:GenericRuntime, valid_dataloader: DataLoader, model: 
                                                 num_beams=1,
                                                 max_new_tokens=args.max_length,
                                                 return_dict_in_generate=True).sequences
+                ## do not do this line after the pad and gather
+                generated_ids = generated_ids[:, feature["input_ids"].size(1):].contiguous()
                 generated_ids = accelerator.pad_across_processes(generated_ids, dim=1, pad_index=tokenizer.eos_token_id)
                 generated_ids = accelerator.gather_for_metrics(generated_ids)
-                generated_ids = generated_ids[:, feature["input_ids"].size(1):]
                 prediction = tokenizer.batch_decode(generated_ids, skip_special_tokens=True, clean_up_tokenization_spaces=False)
                 predictions.extend(prediction)
 
@@ -174,7 +174,7 @@ def evaluate(args, runtime:GenericRuntime, valid_dataloader: DataLoader, model: 
             score = 1
         all_data.append({"question": metadata["question"],
                          "answer": metadata["answer"],
-                         "predicted_answer": ans,
+                         "predicted_answer": numeric_ans,
                          "score": score,
                          "code": code,
                          "generation": prediction})
@@ -217,7 +217,7 @@ def main():
                                     cot_finetune=bool(args.cot_ft),
                                     max_length=args.max_length),
             batched=True,
-            load_from_cache_file=True,
+            load_from_cache_file=False,
             num_proc=args.num_proc,
             remove_columns=dataset.column_names
         )
@@ -227,7 +227,7 @@ def main():
                                     cot_finetune=bool(args.cot_ft),
                                     max_length=args.max_length),
             batched=True,
-            load_from_cache_file=True,
+            load_from_cache_file=False,
             num_proc=args.num_proc,
             remove_columns=eval_dataset.column_names
         )
