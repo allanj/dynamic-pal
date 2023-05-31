@@ -1,67 +1,29 @@
-# PaL:  Program-Aided Language Model
-Repo for the paper [PaL: Program-Aided Language Models](https://arxiv.org/pdf/2211.10435.pdf).
+# Leveraging Training Data in Few-Shot Prompting for Numerical Reasoning
+Repo for the paper [Leveraging Training Data in Few-Shot Prompting for Numerical Reasoning](https://arxiv.org/abs/2305.18170).
 
-In PaL, Large Language Model solves reasoning problems that involve complex arithmetic and procedural tasks by generating reasoning chains of **text and code**.  This offloads the execution of the code to a program runtime, in our case, a Python interpreter. In our paper, we implement PaL using a few-shot prompting approach. 
+Our codebase is adapted from the [PaL: Program-Aided Language Models](https://github.com/reasoning-machines/pal).
 
-<img width="879" alt="image" src="https://user-images.githubusercontent.com/15002544/202954503-b3fade57-87ff-4beb-81de-72405577b2b4.png">
+## Dynamic Program Prompting
 
-
-This repo provides an interactive implementation of PAL.
-
-## Installation
-Clone this repo and install with `pip`.
-```
-git clone https://github.com/luyug/pal
-pip install -e ./pal
+```bash
+python3 -m scripts.eval_basedon_sim --dataset_folder=gsm8k
 ```
 
-Before running the scripts, set the OpenAI key,
-```export OPENAI_API_KEY='sk-...'```
-## Interactive Usage
-The core components of the `pal` package are the Interface classes. Specifically, `ProgramInterface` connects the LLM backend, a Python backend and user prompts.
+## Program Distillation
+You also need to install the `accelerate` for distributed training
+```bash
+pip install accelerate
+accelerate launch gsm8k_gen.py --train_file=datasets/gsm8k/gsm8k_train_eval_result.json \
+                              --dev_file=datasets/gsm8k/test_sent_split.json 
 ```
-import pal
-from pal.prompt import math_prompts
 
-interface = pal.interface.ProgramInterface(
-  model='code-davinci-002',
-  stop='\n\n\n', # stop generation str for Codex API
-  get_answer_expr='solution()' # python expression evaluated after generated code to obtain answer 
-)
-
-question = 'xxxxx'
-prompt = math_prompts.MATH_PROMPT.format(question=question)
-answer = interface.run(prompt)
-```
-Here, the `interface` 's `run`  method will run generation with the OpenAI API, run the generated snippet and then evaluate `get_answer_expr` (here `solution()`) to obtain the final answer.  
-
-User should set `get_answer_expr` based on the prompt.
-
-## Inference Loop
-We provide simple inference loops in the `scripts/` folder.
-```
-mkdir eval_results
-python scripts/{colored_objects|gsm|date_understanding|penguin}_eval.py
-``` 
-
-For running bulk inference, we used the generic prompting library [prompt-lib](https://github.com/madaan/prompt-lib) and recommend it for running CoT inferenence on all tasks used in our work.
-
-## Results
-
-<img width="831" alt="image" src="https://user-images.githubusercontent.com/15002544/202954755-bf89aab6-6467-436e-98d6-2ca378a20116.png">
-
-<img width="1166" alt="image" src="https://user-images.githubusercontent.com/15002544/202954780-7e1221f1-3008-46d9-877b-b26df9f98d66.png">
-
-<img width="597" alt="image" src="https://user-images.githubusercontent.com/15002544/202954797-68e8d45d-3435-4abf-96e4-f10371b55e38.png">
-
-For the complete details of the results, see the [paper](https://arxiv.org/pdf/2211.10435.pdf) .
 
 ## Citation
 ```
-@article{gao2022pal,
-  title={PAL: Program-aided Language Models},
-  author={Gao, Luyu and Madaan, Aman and Zhou, Shuyan and Alon, Uri and Liu, Pengfei and Yang, Yiming and Callan, Jamie and Neubig, Graham},
-  journal={arXiv preprint arXiv:2211.10435},
-  year={2022}
+@inproceedings{jie2023leveraging,
+  title={Leveraging Training Data in Few-Shot Prompting for Numerical Reasoning},
+  author={Jie, Zhanming and Lu, Wei},
+  booktitle={Proceedings of ACL},
+  year={2023}
 }
 ```
