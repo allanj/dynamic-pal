@@ -1,5 +1,5 @@
 # Leveraging Training Data in Few-Shot Prompting for Numerical Reasoning
-Repo for the paper [Leveraging Training Data in Few-Shot Prompting for Numerical Reasoning](https://arxiv.org/abs/2305.18170).
+Repo for the paper [Leveraging Training Data in Few-Shot Prompting for Numerical Reasoning](https://arxiv.org/abs/2305.18170) appear in ACL 2023.
 
 Our codebase is adapted from the [PaL: Program-Aided Language Models](https://github.com/reasoning-machines/pal).
 
