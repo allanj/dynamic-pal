@@ -38,7 +38,7 @@ def write_data(file: str, data) -> None:
 parser = argparse.ArgumentParser()
 parser.add_argument('--append', action='store_true')
 parser.add_argument('--verbose', action='store_true')
-parser.add_argument('--dataset', default='ssat', type=str)
+parser.add_argument('--dataset_folder', default='gsm8k', type=str)
 parser.add_argument('--majority_at', default=1, type=int)
 parser.add_argument('--temperature', default=0.0, type=float)
 parser.add_argument('--top_p', default=1.0, type=float)
@@ -212,7 +212,7 @@ if __name__ == '__main__':
     training_data = None
     train_sent_embs = None
     test_sent_embs = None
-    dataset_folder = args.dataset
+    dataset_folder = args.dataset_folder
     emb_suffix = args.emb_model
     if dataset_folder == "gsm8k":
         DATA_PATH = f'datasets/{dataset_folder}/gsm8k_test_sent_split.json'
