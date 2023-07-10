@@ -12,8 +12,28 @@ Our codebase is adapted from the [PaL: Program-Aided Language Models](https://gi
 ```bash
 pip3 install accelerate # for distributed training
 pip3 install openai # for chatgpt
+pip3 install sentence-transformers # optional for sentence embedding
 ```
 **NOTE**: you also need the `OPENAI KEY` if you want to obtain the annotations yourself. 
+
+## Datasets
+
+### (Optional) Similarity-based training data
+If you need the sentence embeddings for the data, I have already processed them and available in Google Drive.
+(In our experiments, we also tried the sentence transformer, which is also as good as the OpenAI embedings. )
+
+| Dataset | Link                                                                                             |
+|---------|--------------------------------------------------------------------------------------------------|
+ | GSM8K   | [Download](https://drive.google.com/drive/folders/1srjGLa5Ers_9eTBO3X97Lg5mbfp2sw76?usp=sharing) |
+|MathQA|[Download](https://drive.google.com/drive/folders/19otXTswUMlvsY2dvyiMl404j02zeT2oC?usp=sharing) |
+| SVAMP   | [Download](https://drive.google.com/drive/folders/1224AT6hAzSw2cSG8ZQ4aPHvhCb2dVkcv?usp=sharing) |
+
+Alternatively, you can obtain the embeddings using this script:
+```bash
+python3 -m preprocess.sent_embedding --dataset_folder=gsm8k
+```
+
+### Program-distilled training data
 
 ## Dynamic Program Prompting
 
