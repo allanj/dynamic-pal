@@ -217,7 +217,7 @@ if __name__ == '__main__':
     if dataset_folder == "gsm8k":
         DATA_PATH = f'datasets/{dataset_folder}/gsm8k_test_sent_split.json'
         if args.similarity_order != 'no_similarity':
-            training_data = read_data(f'datasets/{dataset_folder}/gsm8k_train_eval_result_expanded_1.json')
+            training_data = read_data(f'datasets/{dataset_folder}/gsm8k_train_eval_result_expanded.json')
             train_sent_embs = np.load(f'datasets/{dataset_folder}/gsm8k_train_sent_emb_{emb_suffix}.npy')
             test_sent_embs = np.load(f'datasets/{dataset_folder}/gsm8k_test_sent_emb_{emb_suffix}.npy')
         test_question_key = "question"

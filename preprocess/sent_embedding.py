@@ -17,7 +17,8 @@ name2model = {
 }
 
 def parse_arguments(parser):
-    parser.add_argument('--dataset', default='ssat', type=str, choices=["gsm8k", "svamp", "MathQA", "ssat"])
+    parser.add_argument('--openai_key', default="", type=str)
+    parser.add_argument('--dataset', default='gsm8k', type=str, choices=["gsm8k", "svamp", "MathQA"])
     parser.add_argument('--embedding_model_name', default='text-embedding-ada-002', type=str)
     args = parser.parse_args()
     # Print out the arguments
@@ -41,8 +42,6 @@ def prompt_emb(input_file, output_file, dataset_name,
             question = obj['question'] if 'question' in obj else obj['sQuestion'].strip() ## for svamp
         elif dataset_name == "MathQA":
             question = obj["Problem"].strip()
-        elif dataset_name == "ssat":
-            question = obj["question"].strip()
         else:
             raise NotImplementedError
         success = False
@@ -76,9 +75,9 @@ def load_sent_model(model_name: str = 'sentence-transformers/sentence-t5-base', 
 
 
 if __name__ == '__main__':
-    openai.api_key = "<>" ##TODO: add your own key
     args = parse_arguments(argparse.ArgumentParser())
     dataset = args.dataset
+    openai.api_key = args.openai_key  ##TODO: add your own key
     embedding_model_name = args.embedding_model_name
     local_model = None
     if embedding_model_name != "text-embedding-ada-002":
@@ -105,13 +104,3 @@ if __name__ == '__main__':
         prompt_emb(input_file="datasets/MathQA/mathqa_test_nodup_our_filtered.json",
                    output_file=f"datasets/MathQA/mathqa_test_emb_{suffix}.npy", dataset_name=dataset,
                    model_name= embedding_model_name, local_model=local_model)
-    elif dataset == "ssat":
-        prompt_emb(input_file="datasets/ssat/parsing_prelabel_v1.json",
-                   output_file=f"datasets/ssat/parsing_prelabel_v1.npy", dataset_name=dataset,
-                   model_name=embedding_model_name, local_model=local_model)
-        # prompt_emb(input_file="datasets/ssat/sat_prelabel.json",
-        #            output_file=f"datasets/ssat/sat_prelabel.npy", dataset_name=dataset,
-        #            model_name=embedding_model_name, local_model=local_model)
-        prompt_emb(input_file="datasets/ssat/parsing_samples_v1.json",
-                   output_file=f"datasets/ssat/parsing_samples_v1.npy", dataset_name=dataset,
-                   model_name=embedding_model_name, local_model=local_model)
