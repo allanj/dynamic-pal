@@ -27,6 +27,7 @@ If you need the sentence embeddings for the data, I have already processed them 
  | GSM8K   | [Download](https://drive.google.com/drive/folders/1srjGLa5Ers_9eTBO3X97Lg5mbfp2sw76?usp=sharing) |
 |MathQA|[Download](https://drive.google.com/drive/folders/19otXTswUMlvsY2dvyiMl404j02zeT2oC?usp=sharing) |
 | SVAMP   | [Download](https://drive.google.com/drive/folders/1224AT6hAzSw2cSG8ZQ4aPHvhCb2dVkcv?usp=sharing) |
+After you downloaded the sentence representation, put them to the corresponding dataset folder under `datasets`.
 
 Alternatively, you can obtain the embeddings using this script:
 ```bash
@@ -35,7 +36,8 @@ python3 -m preprocess.sent_embedding --openai_key=xxx --dataset_folder=gsm8k --e
 
 `openai_key` is required if we use the OpenAI embeddings. `dataset_folder` should be within `[gsm8k, svamp, MathQA]`, the last one is can be "`text-embedding-ada-002`", "`sentence-transformers`" or "`princeton-nlp`". The last one use SimCSE to obtain the sentence representations.
 
-### Program-distilled training data
+### Program-distilled Training data
+All data has been placed under the `datasets` folder.
 
 ## Dynamic Program Prompting
 
@@ -43,13 +45,19 @@ python3 -m preprocess.sent_embedding --openai_key=xxx --dataset_folder=gsm8k --e
 python3 -m scripts.eval_basedon_sim --dataset_folder=gsm8k
 ```
 
+You can specify other arguments such as `similarity_order` or `top_k_prompt` (number of exemplars as prompt).
+
 ## Program Distillation
 You also need to install the `accelerate` for distributed training
 ```bash
 accelerate launch gsm8k_gen.py --train_file=datasets/gsm8k/gsm8k_train_eval_result.json \
-                              --dev_file=datasets/gsm8k/test_sent_split.json 
+                              --dev_file=datasets/gsm8k/test_sent_split.json --model_folder=gsm8k_program_sft
 ```
 
+The script will automatically download the `Salesforce/codegen-350M-mono` from HuggingFace.
+
+## TODO
+- [ ] Revise the code for prompting and Codex no longer available
 
 ## Citation
 ```

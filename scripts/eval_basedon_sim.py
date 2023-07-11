@@ -45,7 +45,7 @@ parser.add_argument('--top_p', default=1.0, type=float)
 parser.add_argument('--max_tokens', default=600, type=int)
 parser.add_argument('--similarity_order', default='most_similar', type=str, choices=['most_similar', 'least_similar', 'random', 'no_similarity'])
 parser.add_argument('--emb_model', default='text-embedding-ada-002', type=str)
-parser.add_argument('--top_k_prompt', default=12, type=int)
+parser.add_argument('--top_k_prompt', default=8, type=int)
 
 
 def find_top_k_prompt(test_sent_embs: np.array, test_question_idx: int, train_sent_embs: np.array, training_data, k= 8,
