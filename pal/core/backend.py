@@ -19,7 +19,7 @@ import os
 openai.api_key = os.getenv('OPENAI_API_KEY')
 
 # GPT-3 API
-def call_gpt(prompt, model='code-davinci-002', stop=None, temperature=0., top_p=1.0,
+def call_gpt(prompt, model='gpt-3.5-turbo', stop=None, temperature=0., top_p=1.0,
         max_tokens=128, majority_at=None):
     num_completions = majority_at if majority_at is not None else 1
     num_completions_batch_size = 2

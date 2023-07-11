@@ -238,16 +238,6 @@ if __name__ == '__main__':
             test_sent_embs = np.load(f'datasets/{dataset_folder}/mathqa_test_emb_{emb_suffix}.npy')
         test_question_key = "Problem"
         answer_key = "answer"
-    elif dataset_folder == "ssat":
-        DATA_PATH = f'datasets/{dataset_folder}/sat_prelabel.json'
-        if args.similarity_order != 'no_similarity':
-            training_data = read_data(f'datasets/{dataset_folder}/parsing_samples.json')
-            train_sent_embs = np.load(f'datasets/{dataset_folder}/parsing_samples.npy')
-            assert len(train_sent_embs) == len(training_data)
-            test_sent_embs = np.load(f'datasets/{dataset_folder}/sat_prelabel.npy')
-            assert len(test_sent_embs) == len(read_data(DATA_PATH))
-        test_question_key = "question"
-        answer_key = None
     else:
         raise ValueError("dataset not found")
 

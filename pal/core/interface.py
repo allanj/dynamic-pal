@@ -70,7 +70,7 @@ class ProgramInterface:
     
     def __init__(
         self,
-        model: str = 'code-davinci-002',
+        model: str = 'gpt-3.5-turbo',
         runtime: Optional[Any] = None,
         stop: str = '\n\n',
         get_answer_symbol: Optional[str] = None,
